@@ -1,1 +1,2 @@
-This is the first time i create a repo
+The capacity-forecast script uses JSON standard outputs from Openstack pertaining Projects, Hypervisors, Servers, Flavors, 
+
