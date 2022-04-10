@@ -16,32 +16,6 @@ from mycapacitymodule2 import menu_report, rack_report, vm_report, hw_report,tot
 
 DEBUG=0
 
-def goodvector(vector, vector2):
-    result=False
-    result2=False
-    countdigits=0
-    countdigits2=0
-    for x in range(len(vector)):
-        if vector[x].isdigit()==True:
-            countdigits+=1
-    if countdigits==len(vector):
-        result=True
-        for x in range(len(vector2)):
-            if vector2[x]>0:
-                countdigits2+=1
-        if countdigits2==len(vector2):
-            result2=True
-    return result and result2
-            
-
-# -------------- CHECK IF SVC IS ALREADY EXISTING IN TARGET DESTINATION SITE -----------------------
-def check_if_svc_alreadythere(svc, dictarray_object):
-
-    if svc in dictarray_object.SERVERDICT:
-        return True
-    else:
-        return False
-
 # ------------------------------------------------------   MAIN  ---------------------------------
 # ------------------------------------------------------   MAIN  ---------------------------------
 def main(arguments):
@@ -57,8 +31,10 @@ def main(arguments):
     DST_REPORTBOX = hw_report()
     MyMENU = menu_report()
     FINAL_REPORTBOX = totalresults_report()
+    FINAL_REPORTBOX.Report=[]
     MyLine = '{0:_^'+str(MyMENU.ScreenWitdh)+'}'
-
+    SRC_RACK_REPORTBOX = rack_report()
+    DST_RACK_REPORTBOX = rack_report()
     # PARSE CLI COMMAND ARGUMENTS INTO PARAMETERS DICTIONARY
     UIMODE=MyMENU.parse_args(arguments, MyPARAMSDICT,SRC_DA, DST_DA)
 
@@ -66,12 +42,17 @@ def main(arguments):
     SRC_VM_REPORTBOX.produce_vm_report(MyPARAMSDICT,SRC_DA)
     SRC_VM_REPORTBOX.sort_report(SRC_VM_REPORTBOX.get_sorting_keys())
     SRC_HW_REPORTBOX.produce_hw_report(MyPARAMSDICT, SRC_DA)
-
+    SRC_RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,SRC_HW_REPORTBOX)
+  
     # PRINT SOURCE VM REPORT
     if MyPARAMSDICT.is_silentmode()==False:
-        MyPARAMSDICT.myprint( MyLine.format("SOURCE"))
+        MyPARAMSDICT.myprint( MyLine.format(menu.OKBLUE+" SOURCE SITE {:} - VM REPORT "+menu.Yellow))
         SRC_VM_REPORTBOX.print_report(MyPARAMSDICT)
         MyPARAMSDICT.myprint(SRC_VM_REPORTBOX.calculate_report_total_usage(MyPARAMSDICT))
+        MyPARAMSDICT.myprint( MyLine.format(menu.OKBLUE+" SOURCE SITE - HARDWARE REPORT "+menu.Yellow))
+        SRC_HW_REPORTBOX.print_report(MyPARAMSDICT)  
+        MyPARAMSDICT.myprint( MyLine.format(menu.OKBLUE+" SOURCE SITE - RACK REPORT "+menu.Yellow))
+        SRC_RACK_REPORTBOX.print_report(MyPARAMSDICT)  
 
     if(SRC_VM_REPORTBOX.length()==0):
         print("ERROR !! - {:s} service(s) could not be found in {:s}".format(MyPARAMSDICT.paramsdict["SERVICE"], MyPARAMSDICT.paramsdict["SUFFISSOSRC"]))
@@ -82,7 +63,7 @@ def main(arguments):
         exit(-1)
 
 
-    RACK_REPORTBOX = rack_report()
+
 
 
     # now scanning all the destination suffix files that match the parameter entered in SUFFISSODST parameter
@@ -90,11 +71,7 @@ def main(arguments):
         MyPARAMSDICT.paramsdict["SUFFISSODST"]=CURRENTDSTSITE
         destsitename=MyPARAMSDICT.parse_suffisso(CURRENTDSTSITE)
 
-        if MyPARAMSDICT.is_silentmode()==False:
-            MyPARAMSDICT.myprint(MyLine.format(""))
-            stringa1 = menu.FAIL+"################### SITE {:s} : HARDWARE CAPACITY: BEFORE RACK REALIGNMENT AND BEFORE INSTANTIATION ###################"+menu.Yellow
-            MyPARAMSDICT.myprint(stringa1.format(MyPARAMSDICT.parse_suffisso(CURRENTDSTSITE)))
-            MyPARAMSDICT.myprint(MyLine.format(destsitename+" : "+CURRENTDSTSITE))
+
 
 
         # CREATE NEW DICTARRRAY FOR DESTINATION SITE DATA AND LOADS DATA INTO DST DICTARRAY
@@ -104,73 +81,102 @@ def main(arguments):
         DST_DA.load_jsons_into_dictarrays(MyPARAMSDICT, dst_paramname)
 
         # FIRST, produce fresh HW report for Destination
-        DST_REPORTBOX.produce_hw_report(MyPARAMSDICT, DST_DA)
-        DST_REPORTBOX.sort_report(DST_REPORTBOX.get_sorting_keys())
-        DST_REPORTBOX.print_report(MyPARAMSDICT)
-        Stringa=DST_REPORTBOX.calculate_report_total_usage(MyPARAMSDICT)
-        MyPARAMSDICT.myprint(Stringa)
+        #DST_REPORTBOX.produce_hw_report(MyPARAMSDICT, DST_DA)
+        #DST_REPORTBOX.sort_report(DST_REPORTBOX.get_sorting_keys())
+        #DST_REPORTBOX.print_report(MyPARAMSDICT)
+        #Stringa=DST_REPORTBOX.calculate_report_total_usage(MyPARAMSDICT)
+        #MyPARAMSDICT.myprint(Stringa)
             
         # AZ to Rack Realign based on JSON input file or AUTOOPTIMIZE: for first parameter on CLI is the filename to use in the same path  as the other JSON files from openstack
         # if AZREALIGN=OPTIMIZE then instead of using an external JSON , the optimal distribution ofracks to AZ is calculated to minimize differences between AZs
         # ----------------------------- OPTIMIZE RACK LAYOUT LOOP ------------------------------------------
         # IF OPTIMIZATION BY FILE OR BY CALCULATION
-        if MyPARAMSDICT.get_azoptimization_mode() in [MyPARAMSDICT.OPTIMIZE_BY_CALC, MyPARAMSDICT.OPTIMIZE_BY_FILE]: 
+        #if MyPARAMSDICT.get_azoptimization_mode() in [MyPARAMSDICT.OPTIMIZE_BY_CALC, MyPARAMSDICT.OPTIMIZE_BY_FILE]: 
             # OPTIMIZATION = true. Can either be based on RACK to AZ map in JSON or Self-optimized
 
-            if MyPARAMSDICT.get_azoptimization_mode()  == MyPARAMSDICT.OPTIMIZE_BY_CALC:
-                # SELF CALCULATED OPTIMIZATION==TRUE
+        if MyPARAMSDICT.get_azoptimization_mode()  == MyPARAMSDICT.OPTIMIZE_BY_CALC:
+        # SELF CALCULATED OPTIMIZATION==TRUE
             
-                for metric_formula in list(MyPARAMSDICT.metricformulas):
+            for metric_formula in list(MyPARAMSDICT.metricformulas):
                     # for every formula
                     # SCan through the optmimized HW dst reports after being optimized in accordance to the selected formulas...
-                    DST_REPORTBOX.produce_hw_report(MyPARAMSDICT, DST_DA)
-                    DST_REPORTBOX.sort_report(DST_REPORTBOX.get_sorting_keys())
-
-                    for myoptimizedrackrecord in DST_REPORTBOX.optimize_AZRealignment_in_HWReport(MyPARAMSDICT,RACK_REPORTBOX,metric_formula):
-                        #go through the resulting hw report, optimized through the previous formulas
-                        # ADJUST REOPTIMIZATION ON HW REPORT = remap rack to AZs in accordance to the result of optimization
-                        DST_REPORTBOX.sort_report(DST_REPORTBOX.get_sorting_keys())
-                        DST_REPORTBOX.print_report(MyPARAMSDICT)
-                        RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,DST_REPORTBOX)
-                        RACK_REPORTBOX.print_report(MyPARAMSDICT)
-                        FINAL_REPORTBOX.produce_Total_Report(MyPARAMSDICT,SRC_VM_REPORTBOX, DST_REPORTBOX, metric_formula,myoptimizedrackrecord)
-						# --------------------- END OF REPLACE with FUNCTION 
-
-
-            else:
-
-            # OPTIMIZATION OF RACKS TO AZ BASED ON JSON FILE 
-                result=[]
-                myoptimizedrackrecord=[]
-                myoptimizedrackrecord= RACK_REPORTBOX.realignAZinhwreport(MyPARAMSDICT, DST_REPORTBOX)
-                metric_formula=''
+                stringa1 = MyLine.format(menu.FAIL+"  DESTINATION SITE -  BEFORE RACK REALIGNMENT AND BEFORE INSTANTIATION ###################"+menu.Yellow)
+                MyPARAMSDICT.myprint(stringa1.format(MyPARAMSDICT.parse_suffisso(CURRENTDSTSITE)))
+                DST_REPORTBOX.produce_hw_report(MyPARAMSDICT, DST_DA)
                 DST_REPORTBOX.sort_report(DST_REPORTBOX.get_sorting_keys())
                 DST_REPORTBOX.print_report(MyPARAMSDICT)
-                RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,DST_REPORTBOX)
-                RACK_REPORTBOX.print_report(MyPARAMSDICT)
-                FINAL_REPORTBOX.produce_Total_Report(MyPARAMSDICT,SRC_VM_REPORTBOX, DST_REPORTBOX, metric_formula, myoptimizedrackrecord)
+
+                for myoptimizedrackrecord in DST_REPORTBOX.optimize_AZRealignment_in_HWReport(MyPARAMSDICT,DST_RACK_REPORTBOX,metric_formula):
+                        #go through the resulting hw report, optimized through the previous formulas
+                        # ADJUST REOPTIMIZATION ON HW REPORT = remap rack to AZs in accordance to the result of optimization
+                    DST_REPORTBOX.sort_report(DST_REPORTBOX.get_sorting_keys())
+
+                    DST_REPORTBOX.print_report(MyPARAMSDICT)
+                    MyPARAMSDICT.myprint(stringa1)
+                    MyPARAMSDICT.myprint(stringa1.format(MyPARAMSDICT.parse_suffisso(CURRENTDSTSITE)))
+                    DST_RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,DST_REPORTBOX)
+                    DST_RACK_REPORTBOX.print_report(MyPARAMSDICT)
+                    FINAL_REPORTBOX.check_capacity_and_produce_Total_Report(MyPARAMSDICT,SRC_VM_REPORTBOX, DST_REPORTBOX, metric_formula,myoptimizedrackrecord)
+                    stringa1 = MyLine.format(menu.FAIL+"  DESTINATION SITE - AFTER RACK REALIGNMENT AND AFTER INSTANTIATION ###################"+menu.Yellow)
+                    MyPARAMSDICT.myprint(stringa1.format(MyPARAMSDICT.parse_suffisso(CURRENTDSTSITE)))
+                    DST_REPORTBOX.print_report(MyPARAMSDICT)
+                    DST_RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,DST_REPORTBOX)
+                    DST_RACK_REPORTBOX.print_report(MyPARAMSDICT)
+
+
+
+        elif MyPARAMSDICT.get_azoptimization_mode()  == MyPARAMSDICT.OPTIMIZE_BY_FILE:
+
+            # OPTIMIZATION OF RACKS TO AZ BASED ON JSON FILE 
+            stringa1 = MyLine.format(menu.FAIL+"  DESTINATION SITE - AFTER RACK REALIGNMENT AND AFTER INSTANTIATION "+menu.Yellow)
+            MyPARAMSDICT.myprint(stringa1)
+            result=[]
+            myoptimizedrackrecord=[]
+            myoptimizedrackrecord= DST_RACK_REPORTBOX.realignAZinhwreport(MyPARAMSDICT, DST_REPORTBOX)
+            metric_formula=''
+            DST_REPORTBOX.produce_hw_report(MyPARAMSDICT, DST_DA)
+            DST_REPORTBOX.sort_report(DST_REPORTBOX.get_sorting_keys())
+
+            DST_REPORTBOX.print_report(MyPARAMSDICT)
+            DST_RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,DST_REPORTBOX)
+            DST_RACK_REPORTBOX.print_report(MyPARAMSDICT)
+            FINAL_REPORTBOX.check_capacity_and_produce_Total_Report(MyPARAMSDICT,SRC_VM_REPORTBOX, DST_REPORTBOX, metric_formula, myoptimizedrackrecord)
+            MyPARAMSDICT.myprint(stringa1)
+            DST_REPORTBOX.print_report(MyPARAMSDICT)
+            DST_RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,DST_REPORTBOX)
+            DST_RACK_REPORTBOX.print_report(MyPARAMSDICT)
 
                 
         # -------------------------------------- USE PLAIN HW REPORT TO INSTANTIATE
-        if MyPARAMSDICT.get_azoptimization_mode() in [ MyPARAMSDICT.NO_OPTIMIZATION ] :
+        elif MyPARAMSDICT.get_azoptimization_mode() == MyPARAMSDICT.NO_OPTIMIZATION :
+            stringa1 = MyLine.format(menu.FAIL+" HARDWARE CAPACITY: NO RACK OPTIMIZATION AND AFTER INSTANTIATION "+menu.Yellow)
+
             # NO OPTIMIZATION OF RACKS TO AZ
             # INstantiate and print updated dest report
             result=[]
             metric_formula=""
             myoptimizedrackrecord=[]
-            RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,DST_REPORTBOX)
-            RACK_REPORTBOX.print_report(MyPARAMSDICT)
-            FINAL_REPORTBOX.produce_Total_Report(MyPARAMSDICT, SRC_VM_REPORTBOX, DST_REPORTBOX,  metric_formula,myoptimizedrackrecord)
-
+            DST_REPORTBOX.produce_hw_report(MyPARAMSDICT, DST_DA)
+            DST_REPORTBOX.sort_report(DST_REPORTBOX.get_sorting_keys())
+            DST_REPORTBOX.print_report(MyPARAMSDICT)
+            DST_RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,DST_REPORTBOX)
+            DST_RACK_REPORTBOX.print_report(MyPARAMSDICT)
+            FINAL_REPORTBOX.check_capacity_and_produce_Total_Report(MyPARAMSDICT, SRC_VM_REPORTBOX, DST_REPORTBOX,  metric_formula,myoptimizedrackrecord)
+            MyPARAMSDICT.myprint(stringa1.format(MyPARAMSDICT.parse_suffisso(CURRENTDSTSITE)))
+            DST_REPORTBOX.print_report(MyPARAMSDICT)
+            DST_RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,DST_REPORTBOX)
+            DST_RACK_REPORTBOX.print_report(MyPARAMSDICT)
+        else:
+            print("MAIN - - ERROR 1")
+            exit(-1)
+            
     
-    # SHOW Parameters dump plus CLI command for subsequent executions via CLI command          
-    MyPARAMSDICT.show_cli_command()
 
     # Print Total Report of Results
-    MyPARAMSDICT.myprint(menu.Yellow+MyLine.format(''))
     MyPARAMSDICT.myprint(MyLine.format('SUMMARY OF RESULTS'))
     FINAL_REPORTBOX.print_report(MyPARAMSDICT)
-    MyPARAMSDICT.myprint(menu.Yellow+MyLine.format(''))
+    # SHOW Parameters dump plus CLI command for subsequent executions via CLI command          
+    MyPARAMSDICT.show_cli_command()
 
 if __name__ == '__main__':
     main(sys.argv)

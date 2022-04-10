@@ -104,17 +104,19 @@ class dictarray:
 
 class report:
     # GENERAL - Length of Each KEY in SOURCE REPORT
-    FIELDLENGTHS = {"TimeStamp": 10, "Site": 6, "Rack": 3, "HypervisorHostname": 15, "vCPUsAvailPerHV": 4, "vCPUsUsedPerHV": 4, "MemoryMBperHV": 7,
-                    "MemoryMBUsedperHV": 7, "AZ": 3, "HostAggr": 6,
+    FIELDLENGTHS = {"TimeStamp": 10, "Site": 6, "Rack": 3, "HypervisorHostname": 15, 
+                    "vCPUsAvailPerHV": 4, "vCPUsUsedPerHV": 4, "MemoryMBperHV": 7,"MemoryMBUsedperHV": 7, 
+                    "AZ": 3, "HostAggr": 6,
                     "Project": 26, "VMname": 32, "Flavor": 30, 
                     "vCPUsUSedPerVM": 3, "RAMusedMBperVM": 6, "CephPerVMGB": 6,
                     "TargetHostAggr": 4,
                     "NewVMs": 100, "ExistingVMs":120,
                     "VCPUsAvailPerRack": 4, "RAMperRack": 8, "VCPUsUsedPerRack":4, "RAMUsedperRack" :8, "NOfComputes":5,
                     "Lineup": 4, "vnfname": 4, "vnfcname": 5,
-                    "Capacity-fits": 4, "DestinationSuffix": 20, "Service": 20, "Outcome": 10, 
+                    "Capacity-fits": 4, "SourceSuffix": 20,"DestinationSuffix": 20, "Service": 20, "Outcome": 60, 
                     "vCPU_Load_after": 6 ,
-                    "Item": 3, "Date": 10, "Suffix": 20, "Projects": 20, "Warning": 10, "default":10
+                    "Item": 3, "Date": 10, "Suffix": 20, "Projects": 20, "Warning": 10, 
+                    "default":10
                     }
     FIELDLISTS = [ "HostAggr", "NewVMs", "ExistingVMs"]
 
@@ -218,6 +220,12 @@ class report:
     def keys_length(self):
         return len(self.get_keys())
 
+    def get_fieldlength(self,key):
+        if key in self.FIELDLENGTHS:
+            return self.FIELDLENGTHS[key]
+        else:
+            return self.FIELDLENGTHS["default"]
+
     def addemptyrecord(self):
         myrecord=[]
         for mykey in self.get_keys():
@@ -250,8 +258,9 @@ class report:
     # ---------------------------------
     # Print a report ARRAY (list of lists), line by line
     def print_report(self, pars):
-
-
+        
+        MyLine = '{0:_^'+str(pars.ScreenWitdh)+'}'
+        pars.myprint(MyLine.format(str(self.__class__)))
         def print_keys_on_top_of_report(self):
             var_Keys=self.get_keys()
             HeaderLines=[]
@@ -259,10 +268,8 @@ class report:
             ColLengths=[]
 
             for ReportKeyItem in var_Keys:
-                if ReportKeyItem not in self.FIELDLENGTHS:
-                    var_FieldLen=self.FIELDLENGTHS["default"]
-                else:
-                    var_FieldLen = self.FIELDLENGTHS[ReportKeyItem]
+
+                var_FieldLen = self.get_fieldlength(ReportKeyItem)
                 var_KeyLen = len(ReportKeyItem)                
                 #print("field = {:s} KeyLen={:d} FieldLen={:d}".format(ReportKeyItem, var_KeyLen,var_FieldLen))
                 NewKeyLine=[]
@@ -291,9 +298,10 @@ class report:
             for i in range(MaxRows):
                 myline=''
                 for j in range(len(var_Keys)):
-                    stringa1="{:"+str( self.FIELDLENGTHS[var_Keys[j] ] )+"s} |"
+                    length=self.get_fieldlength(var_Keys[j])
+                    stringa1="{:"+str( length  )+"s} |"
                     myline+=stringa1.format(NewHeaders[j][i])      
-                print(stringa1.format(myline))
+                pars.myprint(stringa1.format(myline))
             
         # --------------------------------------------------------------------------------------------------------
         # PRINT_REPORT - def procedure
@@ -399,54 +407,7 @@ class report:
         retval.append(len(self.Report))
         return retval
 
-    # ----------------------------------------------------------------------------------------------------------------------------------------
-    # PRODUCE TOTAL REPORT
-    # ----------------------------------------------------------------------------------------------------------------------------------------
-    def produce_Total_Report(self, pars,  SRC_REPORTBOX, DST_REPORTBOX, metric_formula, myoptimizedrackrecord):
-        
-        destsitename = pars.parse_suffisso(pars.paramsdict["SUFFISSODST"])
-        MODE_OF_OPT_OPS = pars.get_azoptimization_mode()
-        result = []
-
-        # Now check if instantiation fits in the newly adjusted report
-        for item in DST_REPORTBOX.check_capacity(pars, SRC_REPORTBOX):
-            result.append(item)
-        # True = Success , False = capacity doesnt fit
-
-        vmfit = result[0]
-
-        if pars.is_silentmode() == False:
-            stringa1 = menu.FAIL + \
-                "################### HARDWARE CAPACITY {:s} AFTER INSTANTIATION FOR {:s} ###################"+menu.Yellow
-
-
-        # ADD RESULT TO RESULT VECTOR, including the measurements (sorting metric, distance metric formulas)
-        result.append(str(int(DST_REPORTBOX.print_report(pars)*100))+"%")
-    #NO_OPTIMIZATION = 0
-    #OPTIMIZE_BY_CALC = 1
-    # OPTIMIZE_BY_FILE = 2
-        if MODE_OF_OPT_OPS == pars.OPTIMIZE_BY_FILE:
-            result.append(metric_formula)
-        if MODE_OF_OPT_OPS in [pars.OPTIMIZE_BY_CALC,pars.OPTIMIZE_BY_FILE]:
-            result.append(myoptimizedrackrecord)
-
-        # IF CAPACITY FITS.....
-        if vmfit:
-            if pars.is_silentmode() == False:
-                stringalinea1 = '{0:-^'+str(pars.ScreenWitdh)+'}'
-                text1 = menu.OKGREEN+stringalinea1
-                pars.myprint(text1.format(destsitename+" --> CAPACITY FITS"))
-            pars.myprint("{}{}{}".format(menu.OKGREEN, result, menu.Yellow))
-        else:
-            if pars.is_silentmode() == False:
-                pars.myprint(
-                    menu.FAIL+"!!!!!  - - - - - - - - - NO SUFFICIENT CAPACITY - - - - -- - -  - !!!! ")
-
-            pars.myprint("{}{}{}".format(menu.FAIL, result, menu.Yellow))
-
-        self.Report.append(result)
-        return vmfit
-
+    
 
     def split_vnfname(self, vmname, resulttype):
         if len(vmname) < 23:
@@ -486,7 +447,7 @@ class report:
         return value
 
     # -------------- CHECK IF NETWORK SERVICE FITS INTO DEST SITE -----------------
-    def check_capacity(self, pars, src):
+    def check_capacity(self, pars, src, totalreport):
 
         def hostaggr_match(pars, hostaggr1, hostaggrlist2):
             if pars.paramsdict["IGNOREHOSTAGS"] == True:
@@ -528,7 +489,9 @@ class report:
         for dstcmp in self.Report:
             dstcmp[DstNewVMsIndex] = []
 
+
         # GO THROUGH ALL VMs in SOURCE REPORT ONE BY ONE....
+
         for srcvm in src.Report:
 
             VM_VCPUS = srcvm[SrcvCPUsUSedPerVMIndex]
@@ -552,7 +515,6 @@ class report:
                 hwram_total = dstcmp[DstMemoryMBperHVIndex]
                 hwcpu_used = dstcmp[DstvCPUsUsedPerHVIndex]
                 hwram_used = dstcmp[DstMemoryMBUsedperHVIndex]
-
                 if VM_VCPUS < hwcpu_total-hwcpu_used and VM_RAM < hwram_total-hwram_used:
                     try:
                         dstcmp[DstvCPUsUsedPerHVIndex] += VM_VCPUS
@@ -560,32 +522,47 @@ class report:
                         #dstcmp.append("{:24s} {:>2d} {:>5s} {:s}".format(VMNAME,VCPUS,dst.mem_show_as_gb(RAM,True),HOSTAGGR[8]))
                         dstcmp[DstNewVMsIndex].append(" {:>10s} ".format(
                             self.split_vnfname(VM_VMNAME, "vnf-vnfc")))
+
                         vmfits = True
                         break
                     except:
                         print("DSTCMP Record:\n{:}".format(dstcmp))
                         print("DSTCMP DstNewVMsIndex:\n{:}".format(
                             DstNewVMsIndex))
+        
+        # CALCULATES THE % OF VCPU USED OVER TOTAL
+        CumulativeVCPUUsed=0
+        CumulativeVCPUAvail=0       
+        for x in self.Report:
+                hwcpu_total = dstcmp[DstvCPUAvailIndex]
+                hwram_total = dstcmp[DstMemoryMBperHVIndex]
+                hwcpu_used = dstcmp[DstvCPUsUsedPerHVIndex]
+                hwram_used = dstcmp[DstMemoryMBUsedperHVIndex]
+                CumulativeVCPUUsed+=hwcpu_used
+                CumulativeVCPUAvail+=hwcpu_total
+        OverallVCPULoad = "{:d}%".format(int( 100*float (CumulativeVCPUUsed/CumulativeVCPUAvail)))
+
+        # APPEND RESULTS TO TOTAL_REPORT OBJECT
+        TotalRepoKeys=totalreport.get_keys()
+        MyRecord=totalreport.addemptyrecord()
+        MyRecord[TotalRepoKeys.index("Capacity-fits")]=vmfits
+        MyRecord[TotalRepoKeys.index("SourceSuffix")]=pars.paramsdict["SUFFISSOSRC"]
+        MyRecord[TotalRepoKeys.index("DestinationSuffix")]=pars.paramsdict["SUFFISSODST"]
+        MyRecord[TotalRepoKeys.index("Service")]=pars.paramsdict["SERVICE"]
+        MyRecord[TotalRepoKeys.index("vCPU_Load_after")]=OverallVCPULoad
 
         if vmfits == False:
-            result.append(vmfits)
-            stringa1 = "VM: {:s} on AZ {:s} and HostAgg {:s} did not have sufficient capacity\n\n".format(
+            #result.append(vmfits)
+            Description = "VM: {:s} on AZ {:s} and HostAgg {:s} did not have sufficient capacity\n\n".format(
                 VMNAME, VM_AZ, VM_HOSTAGGR)
-            result.append(pars.paramsdict["SUFFISSODST"])
-            result.append(pars.paramsdict["SERVICE"])
-            result.append(stringa1)
-            result.append(VMNAME)
-            result.append(VM_AZ)
-            result.append(VM_HOSTAGGR)
         else:
-            result.append(vmfits)
-            stringa1 = "SUCCESS"
-            result.append(pars.paramsdict["SUFFISSODST"])
-            result.append(pars.paramsdict["SERVICE"])
-            result.append(stringa1)
+            Description = "SUCCESS : all source VM instantiated into destination"
+
+        MyRecord[TotalRepoKeys.index("Outcome")]=Description
+
         return result
 
-class parameters:
+class parameters():
     # -------------------------------------------------------------------------------------------------------------------------
     # GLOBAL DICTIONARIES: these are used to store command line arguments values or user input values (so that the behavior is consistent between User interactive mode and CLI mode)
 
@@ -701,7 +678,7 @@ class parameters:
         else:
             return "stg810"
 
-class menu:
+class menu(parameters):
     # -------------------------------------------------------------------------------------------------------------------------
     # -------------------------------------------------------------------------------------------------------------------------
     #                           CLASS :     MENU
