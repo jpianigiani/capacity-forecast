@@ -73,9 +73,7 @@ class vm_report(report):
 
         #if pars.paramsdict["SILENTMODE"]==False:
         #    pars.myprint("REPORT KEYS \n {:s} \n".format( json.dumps(self.get_keys())))
-        print("--- DEBUG produce_vm_report ")
-        print(dictarray_object)
-        print("--- DEBUG produce_vm_report ")
+
 
         #FLAVOR_LIST=dictarray_object.DICT_ARRAY[3]
         #VOLUME_LIST=dictarray_object.DICT_ARRAY[4]
@@ -499,7 +497,7 @@ class hw_report(report):
     #------------------------------------------------------------------------------------------------------------------------------------------------------------
         #if no optimization, HW_REPORT returned as is
         if pars.get_azoptimization_mode()==pars.NO_OPTIMIZATION:
-            print(" ### DEBUG - no AZ realign parameter passed to select input file for Rack to AZ realignment")
+            #print(" ### DEBUG - no AZ realign parameter passed to select input file for Rack to AZ realignment")
             return self
         if len(self.Report)==0:
             print("ERROR in optimize_AZRealignment_in_HWReport : length of HW report = 0 entries ")
@@ -510,7 +508,7 @@ class hw_report(report):
         stringalinea1 = '{0:_^'+str(pars.ScreenWitdh)+'}'
 
         #Initialize and produce RACK REPORT . Initialize report for optimixzation results
-        pars.myprint (stringalinea1.format(menu.Yellow+SUFFISSO+"  initial layout"+str(SUFFISSO)))
+        pars.myprint (stringalinea1.format(menu.Yellow+SUFFISSO+"  initial layout "+str(SUFFISSO)))
         MyRackReport.Report=[]
         MyRackReport.Rack_Opt_Memory={ "rackslayout":[],"azcpus":[],"sigma2":math.inf, "metric_formula":''}
         MyRackReport.Rack_Opt_Memory["metric_formula"]=metric_formula
@@ -549,7 +547,7 @@ class hw_report(report):
             total = total*i
         
         #Init line
-        pars.myprint (stringalinea1.format("\n"+menu.FAIL+ pars.parse_suffisso(SUFFISSO)+menu.Yellow+" -->  brute force scan on rack pairs to optimize AZ resource distribution, based on metric : "+metric_formula+menu.Yellow))
+        pars.myprint (stringalinea1.format("\n"+menu.FAIL+ pars.parse_suffisso(SUFFISSO)+menu.Yellow+" -->  brute force scan on rack pairs to optimize AZ resource distribution, based on metric : "+metric_formula+menu.Yellow+" "))
 
         sys.stdout.write('\t|')
         sys.stdout.flush()
@@ -685,7 +683,6 @@ class rack_report(report):
 
         self.Report=[]
         conta=0
-        print(len(hwreportbox.Report))
         for myRecord in hwreportbox.Report:
             RackValueFromHWReport = myRecord[rack_hwindex]
             RackFound=False
@@ -737,7 +734,7 @@ class rack_report(report):
     #--------------------------------------- PROCEDURE TO REALIGN AZ based on EXTERNALLY PROVIDED JSON FILE    -----------------------------
     def realignAZinhwreport(self,pars,dst_report):
         if len(pars.paramsdict["AZREALIGN"])==0:
-            print(" ### DEBUG - no AZ realign parameter passed to select input file for Rack to AZ realignment")
+            #print(" ### DEBUG - no AZ realign parameter passed to select input file for Rack to AZ realignment")
             return dst_report
         try:
             FILENAME=pars.PATH+'/azrealign_targetracklayout_'+pars.paramsdict["AZREALIGN"]+".json"
@@ -794,7 +791,7 @@ class rack_report(report):
 class totalresults_report(report):
 
     def __init__(self):
-        self.TOTALRESULTS_REPORT_KEYS=("Capacity-fits","DestinationSuffix","Service","Outcome","vCPU_Load_after")
+        self.TOTALRESULTS_REPORT_KEYS=("Capacity-fits","SourceSuffix", "DestinationSuffix","Service","vCPU_Load_after","Outcome")
         self.TOTALRESULTS_REPORT_SORTINGKEYS=["Capacity-fits"]
         self.ReportType=super().ReportType_TOTALRESULTS
         self.ReportTotalUsage=[]
@@ -804,51 +801,14 @@ class totalresults_report(report):
     # ----------------------------------------------------------------------------------------------------------------------------------------
     # PRODUCE TOTAL REPORT
     # ----------------------------------------------------------------------------------------------------------------------------------------
-    def produce_Total_Report(self, pars,  SRC_REPORTBOX, DST_REPORTBOX, metric_formula, myoptimizedrackrecord):
+    def check_capacity_and_produce_Total_Report(self, pars,  SRC_REPORTBOX, DST_REPORTBOX, metric_formula, myoptimizedrackrecord):
         
         destsitename = pars.parse_suffisso(pars.paramsdict["SUFFISSODST"])
         MODE_OF_OPT_OPS = pars.get_azoptimization_mode()
         
-        self.Report=[]
-        result=self.addemptyrecord()
         # Now check if instantiation fits in the newly adjusted report
-        for item in DST_REPORTBOX.check_capacity(pars, SRC_REPORTBOX):
-            print("DEBUG STICAZZI3 Item={}".format(item))
-            self.UpdateLastRecordValueByKey("Capacity-fits",item)
-        # True = Success , False = capacity doesnt fit
+        DST_REPORTBOX.check_capacity(pars, SRC_REPORTBOX, self)
 
-        vmfit = result[0]
-
-        if pars.is_silentmode() == False:
-            stringa1 = menu.FAIL + \
-                "################### HARDWARE CAPACITY {:s} AFTER INSTANTIATION FOR {:s} ###################"+menu.Yellow
-
-
-        # ADD RESULT TO RESULT VECTOR, including the measurements (sorting metric, distance metric formulas)
-        result.append(str(int(DST_REPORTBOX.print_report(pars)*100))+"%")
-    #NO_OPTIMIZATION = 0
-    #OPTIMIZE_BY_CALC = 1
-    # OPTIMIZE_BY_FILE = 2
-        if MODE_OF_OPT_OPS == pars.OPTIMIZE_BY_FILE:
-            result.append(metric_formula)
-        if MODE_OF_OPT_OPS in [pars.OPTIMIZE_BY_CALC,pars.OPTIMIZE_BY_FILE]:
-            result.append(myoptimizedrackrecord)
-
-        # IF CAPACITY FITS.....
-        if vmfit:
-            if pars.is_silentmode() == False:
-                stringalinea1 = '{0:-^'+str(pars.ScreenWitdh)+'}'
-                text1 = menu.OKGREEN+stringalinea1
-                pars.myprint(text1.format(destsitename+" --> CAPACITY FITS"))
-            pars.myprint("{}{}{}".format(menu.OKGREEN, result, menu.Yellow))
-        else:
-            if pars.is_silentmode() == False:
-                pars.myprint(
-                    menu.FAIL+"!!!!!  - - - - - - - - - NO SUFFICIENT CAPACITY - - - - -- - -  - !!!! ")
-
-            pars.myprint("{}{}{}".format(menu.FAIL, result, menu.Yellow))
-
-        self.Report.append(result)
-        return vmfit
+        return
 
 
