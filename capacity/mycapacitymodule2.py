@@ -298,6 +298,9 @@ class menu_report(menu,report):
             cleandict=dict.fromkeys(cleanlist)
             cleanlist=[]
             cleanlist=list(cleandict)
+            if len(cleanlist)==0:
+                print("ERROR : no Openstack JSONs files found in ./JSON folder.. exiting")
+                exit(-1)
             return(cleanlist)
 
 
