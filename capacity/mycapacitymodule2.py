@@ -174,6 +174,32 @@ class vm_report(report):
 
                                 #self.appendnewrecord(TEMP_RES)
                                 TEMP_RES=[]
+
+
+
+    def calculate_report_total_usage(self, pars):
+        totvcpuused = 0
+        totramused = 0
+        retval = []
+
+        if self.ReportType==self.ReportType_VM:
+            Item1 = "vCPUsUSedPerVM"
+            Item2 = "RAMusedMBperVM"
+        for x in self.Report:
+            totvcpuused += x[self.get_keys().index(Item1)]
+            totramused += x[self.get_keys().index(Item2)]
+
+        self.ReportTotalUsage=[]
+        retval.append("TOTAL # OF VCPUs :")
+        retval.append(totvcpuused)
+        retval.append("TOTAL RAM USED :")
+        retval.append(self.mem_show_as_gb(totramused,True))
+        retval.append("TOTAL # OF OBJECTS :")
+        retval.append(len(self.Report))
+        self.ReportTotalUsage=retval
+        return retval
+
+
 class menu_report(menu,report):
 
     def __init__(self):
@@ -273,7 +299,7 @@ class menu_report(menu,report):
     def parse_args(self,input,output, src_da, dst_da):
         # ----------------------------------------------
         # this function is used to fetch - for a suffix - the list of files to use 
-        def get_destfiles_to_scan(self):
+        def get_destfiles_to_scan():
             # ----------------------------------------------
             # TRUE if site  == mgmt site
             def ismgmtsite(suffix):
@@ -426,8 +452,8 @@ class hw_report(report):
     # ---------------------------------------------------------------------------------------------------
     # Produces a report (list of lists); one row per hardware compute based on the global ARRAY of (list,dict) passed as parameter. 
     # ---------------------------------------------------------------------------------------------------
-    def produce_hw_report(self,pars, dst_dictarray_object ):
-            SUFFISSO = pars.paramsdict["SUFFISSODST"]
+    def produce_hw_report(self,SUFFISSO, pars, dst_dictarray_object ):
+            #SUFFISSO = pars.paramsdict["SUFFISSODST"]
             self.Report=[]
             TEMP_RES=[]
             #("TimeStamp", "Site", "Rack", "HypervisorHostname", "vCPUsAvailPerHV", "vCPUsUsedPerHV", "MemoryMBperHV", "MemoryMBUsedperHV", "AZ", "HostAggr")
@@ -452,7 +478,7 @@ class hw_report(report):
                 self.UpdateLastRecordValueByKey( "HostAggr",AGGS[1:]) 
 
                 # DESTINATIONWIPE Parameter implementation
-                if pars.paramsdict["DESTINATIONWIPE"]==True:
+                if pars.paramsdict["DESTINATIONWIPE"]==True and SUFFISSO==pars.paramsdict["SUFFISSODST"]:
                     self.UpdateLastRecordValueByKey( "vCPUsUsedPerHV",0)
                     self.UpdateLastRecordValueByKey( "MemoryMBUsedperHV",0)
                     EmptyVMList=[]
@@ -465,6 +491,32 @@ class hw_report(report):
 
                 EmptyVMList=[]
                 self.UpdateLastRecordValueByKey( "NewVMs",EmptyVMList) 
+
+    def Calculate_UsageSymmetry_ofLoadPerCompute(self): 
+        LoadValuesPerCompute=self.get_column_by_key("vCPUsUsedPerHV")
+        CapacityValuesPerCompute=self.get_column_by_key("vCPUsAvailPerHV")
+        total=0
+        NOfEntries = len (LoadValuesPerCompute)
+        totalLoad = 0
+        totalCapacity=0
+        average=0.0
+        deviationLoad=0
+        deviationCapacity=0
+        for item in range(NOfEntries):
+            totalLoad+=LoadValuesPerCompute[item]
+            totalCapacity+=CapacityValuesPerCompute[item]
+        averageLoad=float(totalLoad/NOfEntries)
+        averageCapacity=float(totalCapacity/NOfEntries)
+        for item in range(NOfEntries):
+            deviationLoad+=(LoadValuesPerCompute[item]-averageLoad)**2
+            deviationCapacity+=(CapacityValuesPerCompute[item]-averageCapacity)**2
+        deviationLoad= math.sqrt(deviationLoad/NOfEntries)
+        deviationCapacity=math.sqrt(deviationCapacity/NOfEntries)
+        
+        return ("Avg. vCPU used per cmp:",averageLoad,
+                "Avg. vCPU avail per cmp:",averageCapacity,
+                "Avg. Deviation of vCPU used per cmp:",deviationLoad,
+                "Avg. Deviation of vCPU avail per cmp:",deviationCapacity)
  # -----------------------------------------------------------------------------------------------------
     #
     #----------------------        AUTOOPTIMIZE RACKS TO AZ ALLOCATION      -------------------------------
@@ -805,13 +857,124 @@ class totalresults_report(report):
     # PRODUCE TOTAL REPORT
     # ----------------------------------------------------------------------------------------------------------------------------------------
     def check_capacity_and_produce_Total_Report(self, pars,  SRC_REPORTBOX, DST_REPORTBOX, metric_formula, myoptimizedrackrecord):
-        
+
+        def hostaggr_match(pars, hostaggr1, hostaggrlist2):
+            if pars.paramsdict["IGNOREHOSTAGS"] == True:
+                return True
+            stringa1 = hostaggr1.upper()
+            stringa2 = stringa1.replace("DTNIMS", "DT_NIMS")
+            for x in hostaggrlist2:
+                x.upper().replace("DTNIMS", "DT_NIMS")
+            retval = stringa2 in hostaggrlist2
+            return retval
+
+
+
         destsitename = pars.parse_suffisso(pars.paramsdict["SUFFISSODST"])
         MODE_OF_OPT_OPS = pars.get_azoptimization_mode()
         
         # Now check if instantiation fits in the newly adjusted report
-        DST_REPORTBOX.check_capacity(pars, SRC_REPORTBOX, self)
 
-        return
+        vmfits = False
+        capacity_fit = []
+        srcvm = []
+        VMNAME = ''
+        HOSTAGGRSET = []
+        HOSTAGGRLIST = []
 
+        # SORT VMs TO BE 'INSTANTIATED' by Project, VNF, VNFC
+        SourceReportSortKeys = ["Project", "vnfname", "vnfcname"]
+        SRC_REPORTBOX.sort_report(SourceReportSortKeys)
+
+        SrcvCPUsUSedPerVMIndex = SRC_REPORTBOX.get_keys().index("vCPUsUSedPerVM")
+        SrcRAMusedMBperVMIndex = SRC_REPORTBOX.get_keys().index("RAMusedMBperVM")
+        SrcAZIndex = SRC_REPORTBOX.get_keys().index("AZ")
+        SrcVMnameIndex = SRC_REPORTBOX.get_keys().index("VMname")
+        SrcHostAggrIndex = SRC_REPORTBOX.get_keys().index("HostAggr")
+        SrcTargetHostAggrIndex = SRC_REPORTBOX.get_keys().index("TargetHostAggr")
+
+        DstvCPUsUsedPerHVIndex = DST_REPORTBOX.get_keys().index("vCPUsUsedPerHV")
+        DstMemoryMBUsedperHVIndex = DST_REPORTBOX.get_keys().index("MemoryMBUsedperHV")
+        DstvCPUAvailIndex = DST_REPORTBOX.get_keys().index("vCPUsAvailPerHV")
+        DstMemoryMBperHVIndex = DST_REPORTBOX.get_keys().index("MemoryMBperHV")
+        DstAZIndex = DST_REPORTBOX.get_keys().index("AZ")
+        DstHostAggrIndex = DST_REPORTBOX.get_keys().index("HostAggr")
+        DstNewVMsIndex = DST_REPORTBOX.get_keys().index("NewVMs")
+
+        # CLEAR NEW VMs on DST REPORT
+        for dstcmp in DST_REPORTBOX.Report:
+            dstcmp[DstNewVMsIndex] = []
+
+
+        # GO THROUGH ALL VMs in SOURCE REPORT ONE BY ONE....
+
+        for srcvm in SRC_REPORTBOX.Report:
+
+            VM_VCPUS = srcvm[SrcvCPUsUSedPerVMIndex]
+            VM_RAM = srcvm[SrcRAMusedMBperVMIndex]
+            VM_AZ = srcvm[SrcAZIndex]
+            VM_VMNAME = srcvm[SrcVMnameIndex]
+            VM_HOSTAGGRSET = set(srcvm[SrcHostAggrIndex])
+            VM_HOSTAGGRLIST = list(HOSTAGGRSET)
+            VM_HOSTAGGR = srcvm[SrcTargetHostAggrIndex]
+
+            # SORT COMPUTES BY LEAST USED VCPU
+            if pars.paramsdict["BESTVMDISTRO"]:
+                sorted(DST_REPORTBOX.Report,
+                       key=lambda x: x[DST_REPORTBOX.get_keys().index("vCPUsUsedPerHV")])
+
+            vmfits = False
+            result = []
+
+            for dstcmp in [x for x in DST_REPORTBOX.Report if hostaggr_match(pars, VM_HOSTAGGR, x[DstHostAggrIndex]) and VM_AZ in x[DstAZIndex]]:
+                hwcpu_total = dstcmp[DstvCPUAvailIndex]
+                hwram_total = dstcmp[DstMemoryMBperHVIndex]
+                hwcpu_used = dstcmp[DstvCPUsUsedPerHVIndex]
+                hwram_used = dstcmp[DstMemoryMBUsedperHVIndex]
+                if VM_VCPUS < hwcpu_total-hwcpu_used and VM_RAM < hwram_total-hwram_used:
+                    try:
+                        dstcmp[DstvCPUsUsedPerHVIndex] += VM_VCPUS
+                        dstcmp[DstMemoryMBUsedperHVIndex] += VM_RAM
+                        #dstcmp.append("{:24s} {:>2d} {:>5s} {:s}".format(VMNAME,VCPUS,dst.mem_show_as_gb(RAM,True),HOSTAGGR[8]))
+                        dstcmp[DstNewVMsIndex].append(" {:>10s} ".format(
+                            DST_REPORTBOX.split_vnfname(VM_VMNAME, "vnf-vnfc")))
+
+                        vmfits = True
+                        break
+                    except:
+                        print("DSTCMP Record:\n{:}".format(dstcmp))
+                        print("DSTCMP DstNewVMsIndex:\n{:}".format(
+                            DstNewVMsIndex))
+        
+        # CALCULATES THE % OF VCPU USED OVER TOTAL
+        CumulativeVCPUUsed=0
+        CumulativeVCPUAvail=0       
+        for x in DST_REPORTBOX.Report:
+                hwcpu_total = dstcmp[DstvCPUAvailIndex]
+                hwram_total = dstcmp[DstMemoryMBperHVIndex]
+                hwcpu_used = dstcmp[DstvCPUsUsedPerHVIndex]
+                hwram_used = dstcmp[DstMemoryMBUsedperHVIndex]
+                CumulativeVCPUUsed+=hwcpu_used
+                CumulativeVCPUAvail+=hwcpu_total
+        OverallVCPULoad = "{:d}%".format(int( 100*float (CumulativeVCPUUsed/CumulativeVCPUAvail)))
+
+        # APPEND RESULTS TO TOTAL_REPORT OBJECT
+        TotalRepoKeys=self.get_keys()
+        MyRecord=self.addemptyrecord()
+        MyRecord[TotalRepoKeys.index("Capacity-fits")]=vmfits
+        MyRecord[TotalRepoKeys.index("SourceSuffix")]=pars.paramsdict["SUFFISSOSRC"]
+        MyRecord[TotalRepoKeys.index("DestinationSuffix")]=pars.paramsdict["SUFFISSODST"]
+        MyRecord[TotalRepoKeys.index("Service")]=pars.paramsdict["SERVICE"]
+        MyRecord[TotalRepoKeys.index("vCPU_Load_after")]=OverallVCPULoad
+
+        if vmfits == False:
+            #result.append(vmfits)
+            Description = "VM: {:s} on AZ {:s} and HostAgg {:s} did not have sufficient capacity".format(
+                VM_VMNAME, VM_AZ, VM_HOSTAGGR)
+        else:
+            Description = "SUCCESS : all source VM instantiated into destination"
+
+        MyRecord[TotalRepoKeys.index("Outcome")]=Description
+
+        return result
 

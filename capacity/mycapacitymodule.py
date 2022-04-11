@@ -82,12 +82,14 @@ class dictarray:
             index += 1
 
         src = str(input("Enter source SERVICES separated by <space>:"))
-        print("--------------------------------------")
         print(src)
-        lista = [int(i) for i in src.split(' ') if i.isdigit()]
         res = []
-        for x in lista:
-            res.append(sortedres[x])
+        if src.upper().find("ALL")>-1:
+            res = [i for i in sortedres]
+        else:
+            lista = [int(i) for i in src.split(' ') if i.isdigit()]
+            for x in lista:
+                res.append(sortedres[x])
         print(res)
         return res
 
@@ -113,7 +115,7 @@ class report:
                     "NewVMs": 100, "ExistingVMs":120,
                     "VCPUsAvailPerRack": 4, "RAMperRack": 8, "VCPUsUsedPerRack":4, "RAMUsedperRack" :8, "NOfComputes":5,
                     "Lineup": 4, "vnfname": 4, "vnfcname": 5,
-                    "Capacity-fits": 4, "SourceSuffix": 20,"DestinationSuffix": 20, "Service": 20, "Outcome": 60, 
+                    "Capacity-fits": 7, "SourceSuffix": 22,"DestinationSuffix": 22, "Service": 50, "Outcome": 100, 
                     "vCPU_Load_after": 6 ,
                     "Item": 3, "Date": 10, "Suffix": 20, "Projects": 20, "Warning": 10, 
                     "default":10
@@ -176,9 +178,29 @@ class report:
     Report = []
     ReportTotalUsage = []
 
+
+
     def __init__(self):
         self.Report = []
         self.ReportTotalUsage = []
+        self.name=str(self.__class__).replace("'",'').replace("<",'').replace(">","").replace("class ","") + hex(id(self))
+
+    def set_name(self,myname):
+        self.name=myname
+        self.ReportFile = open(self.name, 'w')
+
+
+    def set_state(self,mystatus):
+        self.State=mystatus
+        self.write_line_to_file(mystatus)
+
+
+    def write_line_to_file(self,line):
+        try:
+            self.ReportFile.write(line+"\n")
+        except:
+            print("ERROR : {} write_line_to_file - name for object {} is empty".format(self.__class__,self.name))
+            exit(-1)
 
     def get_sorting_keys(self):
         try:
@@ -260,7 +282,18 @@ class report:
     def print_report(self, pars):
         
         MyLine = '{0:_^'+str(pars.ScreenWitdh)+'}'
-        pars.myprint(MyLine.format(str(self.__class__)))
+        a = str(self.__class__)
+        b= a.replace("'",'').replace("<",'').replace(">","").replace("class ","")
+        if b.find("vm_report")>-1:
+            color=menu.OKGREEN
+        else:
+            color=menu.Yellow
+
+        pars.myprint(MyLine.format(self.name))
+        self.write_line_to_file(MyLine.format(self.name)+"\n")
+        pars.myprint(MyLine.format(self.State))
+        self.write_line_to_file(MyLine.format(self.State)+"\n")
+
         def print_keys_on_top_of_report(self):
             var_Keys=self.get_keys()
             HeaderLines=[]
@@ -301,7 +334,8 @@ class report:
                     length=self.get_fieldlength(var_Keys[j])
                     stringa1="{:"+str( length  )+"s} |"
                     myline+=stringa1.format(NewHeaders[j][i])      
-                pars.myprint(stringa1.format(myline))
+                pars.myprint(stringa1.format(color+myline))
+                self.write_line_to_file(stringa1.format(color+myline))
             
         # --------------------------------------------------------------------------------------------------------
         # PRINT_REPORT - def procedure
@@ -313,7 +347,7 @@ class report:
             print("-- print_report")
             exit(-1)
         if pars.is_silentmode() == False:
-            pars.myprint(menu.Yellow)
+            pars.myprint(color)
         
         print_keys_on_top_of_report(self)
 
@@ -355,12 +389,22 @@ class report:
                         myline += stringa1.format(tmpline)
                     else:
                         value = str(initialvalue)
-                        myline += stringa1.format(eval(transform))
+                        myline += stringa1.format(eval(transform)[0:length])
                         #myline += eval(transform) + " | "
                 except:
                     myline += stringa2.format("## |")
             
             pars.myprint("{:s}".format(myline))
+            self.write_line_to_file("{:s}".format(myline))
+
+        if len(self.ReportTotalUsage)>0:
+            myline=self.ReportTotalUsage
+            pars.myprint(myline)
+            self.write_line_to_file("{:}".format(myline))
+
+
+
+            
 
         return -1
 
@@ -386,25 +430,34 @@ class report:
             return -1
 
     def calculate_report_total_usage(self, pars):
-        applicable_reporttypes = ['VM', "HW"]
         totvcpuavail = 0
         totvcpuused = 0
-        if self.ReportType in applicable_reporttypes:
-            for x in self.Report:
-                totvcpuavail += x[self.get_keys().index("vCPUsAvailPerHV")]
-                totvcpuused += x[self.get_keys().index("vCPUsUsedPerHV")]
-                if totvcpuavail > 0:
-                    usage = totvcpuused / float(totvcpuavail)
-                else:
-                    usage = 0
+        retval = []
+        if self.ReportType==self.ReportType_HW:
+            Divisor = "vCPUsAvailPerHV"
+            Dividend = "vCPUsUsedPerHV"
+
+        for x in self.Report:
+            totvcpuavail += x[self.get_keys().index(Divisor)]
+            totvcpuused += x[self.get_keys().index(Dividend)]
+        if totvcpuavail > 0:
+            usage = totvcpuused / float(totvcpuavail)
         else:
             usage = 0
+        
+        self.ReportTotalUsage=[]
+        if self.ReportType==self.ReportType_HW:
+            retval.append("TOTAL VCPU USAGE :")
+            retval.append(str(int(usage*100))+"%")
 
-        retval = []
-        retval.append("TOTAL VCPU USAGE :")
-        retval.append(str(int(usage*100))+"%")
+        retval.append("TOTAL # OF VCPUs :")
+        retval.append(totvcpuused)
         retval.append("TOTAL # OF OBJECTS :")
         retval.append(len(self.Report))
+        
+        retval.append("COMPUTE LOAD SYMMETRY :")
+        retval.append(self.Calculate_UsageSymmetry_ofLoadPerCompute()) 
+        self.ReportTotalUsage=retval
         return retval
 
     
@@ -446,121 +499,6 @@ class report:
         value= x.replace("DT_NIMS_", "")
         return value
 
-    # -------------- CHECK IF NETWORK SERVICE FITS INTO DEST SITE -----------------
-    def check_capacity(self, pars, src, totalreport):
-
-        def hostaggr_match(pars, hostaggr1, hostaggrlist2):
-            if pars.paramsdict["IGNOREHOSTAGS"] == True:
-                return True
-            stringa1 = hostaggr1.upper()
-            stringa2 = stringa1.replace("DTNIMS", "DT_NIMS")
-            for x in hostaggrlist2:
-                x.upper().replace("DTNIMS", "DT_NIMS")
-            retval = stringa2 in hostaggrlist2
-            return retval
-
-        vmfits = False
-        capacity_fit = []
-        srcvm = []
-        VMNAME = ''
-        HOSTAGGRSET = []
-        HOSTAGGRLIST = []
-
-        # SORT VMs TO BE 'INSTANTIATED' by Project, VNF, VNFC
-        SourceReportSortKeys = ["Project", "vnfname", "vnfcname"]
-        src.sort_report(SourceReportSortKeys)
-
-        SrcvCPUsUSedPerVMIndex = src.get_keys().index("vCPUsUSedPerVM")
-        SrcRAMusedMBperVMIndex = src.get_keys().index("RAMusedMBperVM")
-        SrcAZIndex = src.get_keys().index("AZ")
-        SrcVMnameIndex = src.get_keys().index("VMname")
-        SrcHostAggrIndex = src.get_keys().index("HostAggr")
-        SrcTargetHostAggrIndex = src.get_keys().index("TargetHostAggr")
-
-        DstvCPUsUsedPerHVIndex = self.get_keys().index("vCPUsUsedPerHV")
-        DstMemoryMBUsedperHVIndex = self.get_keys().index("MemoryMBUsedperHV")
-        DstvCPUAvailIndex = self.get_keys().index("vCPUsAvailPerHV")
-        DstMemoryMBperHVIndex = self.get_keys().index("MemoryMBperHV")
-        DstAZIndex = self.get_keys().index("AZ")
-        DstHostAggrIndex = self.get_keys().index("HostAggr")
-        DstNewVMsIndex = self.get_keys().index("NewVMs")
-
-        # CLEAR NEW VMs on DST REPORT
-        for dstcmp in self.Report:
-            dstcmp[DstNewVMsIndex] = []
-
-
-        # GO THROUGH ALL VMs in SOURCE REPORT ONE BY ONE....
-
-        for srcvm in src.Report:
-
-            VM_VCPUS = srcvm[SrcvCPUsUSedPerVMIndex]
-            VM_RAM = srcvm[SrcRAMusedMBperVMIndex]
-            VM_AZ = srcvm[SrcAZIndex]
-            VM_VMNAME = srcvm[SrcVMnameIndex]
-            VM_HOSTAGGRSET = set(srcvm[SrcHostAggrIndex])
-            VM_HOSTAGGRLIST = list(HOSTAGGRSET)
-            VM_HOSTAGGR = srcvm[SrcTargetHostAggrIndex]
-
-            # SORT COMPUTES BY LEAST USED VCPU
-            if pars.paramsdict["BESTVMDISTRO"]:
-                sorted(self.Report,
-                       key=lambda x: x[self.get_keys().index("vCPUsUsedPerHV")])
-
-            vmfits = False
-            result = []
-
-            for dstcmp in [x for x in self.Report if hostaggr_match(pars, VM_HOSTAGGR, x[DstHostAggrIndex]) and VM_AZ in x[DstAZIndex]]:
-                hwcpu_total = dstcmp[DstvCPUAvailIndex]
-                hwram_total = dstcmp[DstMemoryMBperHVIndex]
-                hwcpu_used = dstcmp[DstvCPUsUsedPerHVIndex]
-                hwram_used = dstcmp[DstMemoryMBUsedperHVIndex]
-                if VM_VCPUS < hwcpu_total-hwcpu_used and VM_RAM < hwram_total-hwram_used:
-                    try:
-                        dstcmp[DstvCPUsUsedPerHVIndex] += VM_VCPUS
-                        dstcmp[DstMemoryMBUsedperHVIndex] += VM_RAM
-                        #dstcmp.append("{:24s} {:>2d} {:>5s} {:s}".format(VMNAME,VCPUS,dst.mem_show_as_gb(RAM,True),HOSTAGGR[8]))
-                        dstcmp[DstNewVMsIndex].append(" {:>10s} ".format(
-                            self.split_vnfname(VM_VMNAME, "vnf-vnfc")))
-
-                        vmfits = True
-                        break
-                    except:
-                        print("DSTCMP Record:\n{:}".format(dstcmp))
-                        print("DSTCMP DstNewVMsIndex:\n{:}".format(
-                            DstNewVMsIndex))
-        
-        # CALCULATES THE % OF VCPU USED OVER TOTAL
-        CumulativeVCPUUsed=0
-        CumulativeVCPUAvail=0       
-        for x in self.Report:
-                hwcpu_total = dstcmp[DstvCPUAvailIndex]
-                hwram_total = dstcmp[DstMemoryMBperHVIndex]
-                hwcpu_used = dstcmp[DstvCPUsUsedPerHVIndex]
-                hwram_used = dstcmp[DstMemoryMBUsedperHVIndex]
-                CumulativeVCPUUsed+=hwcpu_used
-                CumulativeVCPUAvail+=hwcpu_total
-        OverallVCPULoad = "{:d}%".format(int( 100*float (CumulativeVCPUUsed/CumulativeVCPUAvail)))
-
-        # APPEND RESULTS TO TOTAL_REPORT OBJECT
-        TotalRepoKeys=totalreport.get_keys()
-        MyRecord=totalreport.addemptyrecord()
-        MyRecord[TotalRepoKeys.index("Capacity-fits")]=vmfits
-        MyRecord[TotalRepoKeys.index("SourceSuffix")]=pars.paramsdict["SUFFISSOSRC"]
-        MyRecord[TotalRepoKeys.index("DestinationSuffix")]=pars.paramsdict["SUFFISSODST"]
-        MyRecord[TotalRepoKeys.index("Service")]=pars.paramsdict["SERVICE"]
-        MyRecord[TotalRepoKeys.index("vCPU_Load_after")]=OverallVCPULoad
-
-        if vmfits == False:
-            #result.append(vmfits)
-            Description = "VM: {:s} on AZ {:s} and HostAgg {:s} did not have sufficient capacity\n\n".format(
-                VMNAME, VM_AZ, VM_HOSTAGGR)
-        else:
-            Description = "SUCCESS : all source VM instantiated into destination"
-
-        MyRecord[TotalRepoKeys.index("Outcome")]=Description
-
-        return result
 
 class parameters():
     # -------------------------------------------------------------------------------------------------------------------------
@@ -645,11 +583,9 @@ class parameters():
         return MODE_OF_OPT_OPS
 
     def show_cli_command(self):
-        MyLine = '{0:_^'+str(self.ScreenWitdh)+'}'
-        self.myprint(MyLine.format('\n\n'))
+        MyLine = menu.OKGREEN+'{0:_^'+str(self.ScreenWitdh)+'}'
         self.myprint(MyLine.format('LIST OF PARAMETER ARGUMENTS'))
         self.myprint(json.dumps(self.paramsdict,indent=22))
-        self.myprint(MyLine.format(''))
         # PRINT CLI COMMAND AND PARAMETERS USED
         CMD = "python3 mynewapp2.py"
         for x in self.paramsdict:
