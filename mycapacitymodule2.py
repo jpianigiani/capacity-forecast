@@ -11,11 +11,12 @@ from mycapacitymodule import *
 
 class vm_report(report):
     def __init__(self):
+        super().__init__()
         self.ReportType=super().ReportType_VM
         self.ReportTotalUsage=[]
         # VM REPORT is used as the source (for the capacity-status.py, also for the destination) to create the complete report (LIST of LISTS, one list per VM) of VMs in that site; these are the report keys
 
-        super().__init__()
+
         self.VM_REPORT_KEYS= self.REPORTFIELDGROUP["VM_Report_Keys"]
         self.VM_REPORT_SORTINGKEYS = self.REPORTFIELDGROUP["VM_Report_Sorting_Keys"]
 
@@ -196,17 +197,20 @@ class vm_report(report):
 class menu_report(menu,report):
 
     def __init__(self):
+        super().__init__()
         self.ReportType=super().ReportType_MENU
         self.ReportTotalUsage=[]
         self.ReportType=self.ReportType_MENU
-        self.MENU_REPORT_SORTINGKEYS= report().REPORTFIELDGROUP["MENU_Report_Keys"]
+        self.MENU_REPORT_KEYS= report().REPORTFIELDGROUP["MENU_Report_Keys"]
         self.MENU_REPORT_SORTINGKEYS = report().REPORTFIELDGROUP["MENU_Report_Sorting_Keys"]
 
         screenrows, screencolumns = os.popen('stty size', 'r').read().split()
         self.ScreenWitdh=int(screencolumns)
         self.SVCNOTTOSHOW = ("service", "admin", "tempest", "c_rally", "DeleteMe", "Kashif")
 
-        super().__init__()
+    
+
+    
     
     #--------------------------------------------------------------------
     # GET LIST OF FILES TO USE IN MENU
@@ -711,8 +715,6 @@ class rack_report(report):
     def produce_rack_report(self, pars, hwreportbox):
         stringalinea1 = '{0:_^'+str(pars.ScreenWitdh)+'}'
 
-
-
     # PARSE VALUES OF RACK, AZ and VCPUS from HW report
         MyHwKeys=hwreportbox.get_keys()
         MyRackKeys=self.get_keys()
@@ -842,15 +844,13 @@ class rack_report(report):
 class totalresults_report(report):
 
     def __init__(self):
-        self.TOTALRESULTS_REPORT_KEYS=("Capacity-fits","SourceSuffix", "DestinationSuffix","Service","vCPU_Load_after","Outcome")
-        self.TOTALRESULTS_REPORT_SORTINGKEYS=["Capacity-fits"]
-
+        super().__init__()
         self.TOTALRESULTS_REPORT_KEYS= report().REPORTFIELDGROUP["TOTALRESULTS_Report_keys"]
         self.TOTALRESULTS_REPORT_SORTINGKEYS = report().REPORTFIELDGROUP["TOTALRESULTS_Report_Sorting_Keys"]
         self.ReportType=super().ReportType_TOTALRESULTS
         self.ReportTotalUsage=[]
         self.Report=[]
-        super().__init__()
+
     
     # ----------------------------------------------------------------------------------------------------------------------------------------
     # PRODUCE TOTAL REPORT

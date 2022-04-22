@@ -1,0 +1,169 @@
+{
+"Files": 
+    {   "PathForOpenstackFiles" : "./JSON",  
+        "PathForOutputReports" : "./REPORTS", 
+        "FileTypes" : ["aggregate_list", "hypervisor_list","server_dict", "flavor_list", "volume_list"]
+    }
+    ,
+
+"FieldLenghts":
+    {
+        "TimeStamp": 10, 
+        "Site": 6, 
+        "Rack": 3, 
+        "HypervisorHostname": 8, 
+        "vCPUsAvailPerHV": 4, 
+        "vCPUsUsedPerHV": 4, 
+        "MemoryMBperHV": 7,
+        "MemoryMBUsedperHV": 7, 
+        "AZ": 3, 
+        "HostAggr": 6,
+        "Project": 14, 
+        "VMname": 26, 
+        "Flavor": 30, 
+        "vCPUsUSedPerVM": 3, 
+        "RAMusedMBperVM": 6, 
+        "CephPerVMGB": 6,
+        "SpareRAM": 8,
+        "TargetHostAggr": 4,
+        "NewVMs": 100, 
+        "ExistingVMs":120,
+        "VCPUsAvailPerRack": 4, 
+        "RAMperRack": 8, 
+        "VCPUsUsedPerRack":4, 
+        "RAMUsedperRack" :8, 
+        "PctUsageOfCmpt":5,
+        "PctUsageOfRk":5,
+        "NOfComputes":5,
+        "Lineup": 4, 
+        "vnfname": 4, 
+        "vnfcname": 5,
+        "Capacity-fits": 7, 
+        "SourceSuffix": 22,
+        "DestinationSuffix": 22, 
+        "Service": 50, 
+        "Outcome": 100, 
+        "vCPU_Load_after": 6 ,
+        "Item": 3, 
+        "Date": 10, 
+        "Suffix": 20, 
+        "Projects": 20, 
+        "Warning": 10, 
+        "default":10
+    },
+    
+"RackOptimizationInputParameters":
+    {
+        "RacksPerAZ": 2, 
+        "MetricFormulasForRackOptimization" : 
+            [
+                "(currentvalue-average)**2"
+            ],
+        "KeyForCalculatingRackOptimization": "VCPUsAvailPerRack"
+    }
+        , 
+"FieldLists" :
+        [ "HostAggr", "NewVMs", "ExistingVMs"],
+"Reports_Keys" : 
+    {
+        "VM_Report_Keys" :
+            [
+                "TimeStamp", "Site",  "Rack", 
+                "HypervisorHostname", "vCPUsAvailPerHV", "vCPUsUsedPerHV", "MemoryMBperHV","MemoryMBUsedperHV", 
+                "AZ", "HostAggr", "Project", "VMname", "Flavor", "vCPUsUSedPerVM", 
+                "RAMusedMBperVM", "CephPerVMGB","TargetHostAggr", 
+                "Lineup","vnfname", "vnfcname", "Warning"
+            ],
+        "VM_Report_Sorting_Keys" : 
+            ["Project" , "AZ", "HypervisorHostname","vnfname", "vnfcname" , "Flavor"],
+        "MENU_Report_Keys":
+            ["Item","Site","Date","Suffix","Projects" ],
+        "MENU_Report_Sorting_Keys":
+            ["Item"],
+        "HW_Report_Keys" : 
+            [
+                "TimeStamp", "Site", "Rack", "HypervisorHostname", "vCPUsAvailPerHV", "vCPUsUsedPerHV", "MemoryMBperHV", "MemoryMBUsedperHV", 
+                "PctUsageOfCmpt","SpareRAM",
+                "AZ", "HostAggr", "ExistingVMs","NewVMs", "Warning"
+            ],
+        "HW_Report_Sorting_Keys":   ["AZ" , "HypervisorHostname"],
+        "RACK_Report_keys" :
+                                    ["Rack","AZ","NOfComputes","VCPUsAvailPerRack","RAMperRack","VCPUsUsedPerRack","RAMUsedperRack","PctUsageOfRk"],
+        "RACK_Report_Sorting_Keys" :["AZ" , "Rack"],
+        "REPORTTOTALS_Report_keys":["TotalVCPUsPerSite", "TotalRAMPerSite", "%VCPUUsedPerSite", "%RAMUsedPerSite"],
+        "REPORTTOTALS_Report_Sorting_Keys":["TotalVCPUs"],
+        "TOTALRESULTS_Report_keys": ["Capacity-fits","SourceSuffix", "DestinationSuffix","Service","vCPU_Load_after","Outcome"],
+        "TOTALRESULTS_Report_Sorting_Keys":     ["Capacity-fits"]
+    }
+    ,
+
+"FieldTransforms" : 
+    {
+        "TimeStamp": "self.tstoshortdate(value)",
+        "Site": "value",
+        "Rack": "value.rjust(length)",
+        "HypervisorHostname": "value[13:28].replace('compdpdk','')",
+        "vCPUsAvailPerHV": "value",
+        "vCPUsUsedPerHV": "value.rjust(length)",
+        "MemoryMBperHV": "self.mem_show_as_gb(value.rjust(length), True)",
+        "MemoryMBUsedperHV": "self.mem_show_as_gb(value.rjust(length), True)",
+        "SpareRAM":"self.mem_show_as_gb(currentrecord['MemoryMBperHV']-currentrecord['MemoryMBUsedperHV'],True)",
+        "AZ": "self.shorten_az(value).rjust(length)",
+        "HostAggr": "self.shorten_hostaggs(value).rjust(1)",
+        "Project": "value.rjust(length).replace('NIMS_','')",
+        "VMname": "value.rjust(length)",
+        "Flavor": "value.rjust(length)",
+        "vCPUsUSedPerVM": "value.rjust(length)",
+        "RAMusedMBperVM": "self.mem_show_as_gb(value.rjust(length), True)",
+        "CephPerVMGB": "self.mem_show_as_gb(value.rjust(length),False)",
+        "PctUsageOfCmpt": "self.show_as_percentage(currentrecord['vCPUsUsedPerHV'],currentrecord['vCPUsAvailPerHV'],length)",
+        "TargetHostAggr": "self.shorten_hostaggs(value).rjust(length)",
+        "ExistingVMs": "self.split_vnfname(value,'vnf-vnfc')+ ' '",
+        "NewVMs": "(value).ljust(10)",
+        "VCPUsPerRack": "value.ljust(length)",
+        "RAMperRack": "self.mem_show_as_gb(value.ljust(length), True)",
+        "VCPUsUsedPerRack":  "value.ljust(length)",
+        "RAMUsedperRack": "self.mem_show_as_gb(value.ljust(length), True)",
+        "PctUsageOfRk": "self.show_as_percentage(currentrecord['VCPUsUsedPerRack'],currentrecord['VCPUsAvailPerRack'],length)",
+        "Lineup": "value.rjust(length)",
+        "vnfname": "value.rjust(length)",
+        "vnfcname": "value.rjust(length)",
+        "NOfComputes":"value.rjust(length)",
+        "default": "value.rjust(length)"
+    } ,
+
+    "Application_Parameters": 
+    {
+        "TIMESTAMP": "", 
+        "SUFFISSOSRC": "", 
+        "SUFFISSODST": "", 
+        "SERVICE": [], 
+        "IGNOREHOSTAGS": false, 
+        "DESTINATIONWIPE": false, 
+        "BESTVMDISTRO": true, 
+        "DESTSCAN": false, 
+        "DESTSITESLIST": [],
+        "SILENTMODE": false, 
+        "AZREALIGN": "", 
+        "SKIPMGMTSITE": false, 
+        "OUTPUTTOFILE": false, 
+        "JUSTSOURCE": true
+    }, 
+"Application_Visible_Parameters": 
+    [ 
+    "SUFFISSOSRC", 
+    "SUFFISSODST", 
+    "SERVICE", 
+    "IGNOREHOSTAGS",
+    "DESTINATIONWIPE", 
+    "BESTVMDISTRO", 
+    "DESTSCAN", 
+    "SILENTMODE", 
+    "AZREALIGN", 
+    "SKIPMGMTSITE", 
+    "OUTPUTTOFILE", 
+    "JUSTSOURCE"
+    ]
+    
+}
+

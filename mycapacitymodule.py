@@ -242,29 +242,41 @@ class report(parameters):
     ReportType_RACK = "RACK"
     ReportType_TOTALRESULTS = "TOTALRESULTS"
     ReportType_MENU = "MENU"
-
+    ReportType_REPORTTOTALUSAGE = "MENU"
     ReportTypesList = (ReportType_VM, ReportType_HW, ReportType_RACK,
-                       ReportType_TOTALRESULTS, ReportType_MENU)
+                       ReportType_TOTALRESULTS, ReportType_MENU,ReportType_REPORTTOTALUSAGE)
 
+    ReportKeysVariables = ["VM_REPORT_KEYS",
+                            "HW_REPORT_KEYS","RACK_REPORT_KEYS",
+                            "TOTALRESULTS_REPORT_KEYS","MENU_REPORT_KEYS",
+                            "HWREPORTTOTALUSAGE_KEYS"]
+    ReportSortingKeysVariables =[
+        "VM_REPORT_SORTINGKEYS",
+        "HW_REPORT_SORTINGKEYS",
+        "RACK_REPORT_SORTINGKEYS",
+        "TOTALRESULTS_REPORT_SORTINGKEYS",
+        "MENU_REPORT_SORTINGKEYS",
+        "HWREPORTTOTALUSAGE_SORTINGKEYS"]
     Report = []
     ReportTotalUsage = []
+
 
     def __init__(self):
         super().__init__()
         self.Report = []
+        self.ReportType=0
+
         self.ReportTotalUsage = []
         self.name=str(self.__class__).replace("'",'').replace("<",'').replace(">","").replace("class ","") + hex(id(self))
         self.FIELDLENGTHS= self.APPLICATIONCONFIG_DICTIONARY["FieldLenghts"]
         self.FIELDLISTS= self.APPLICATIONCONFIG_DICTIONARY["FieldLists"]
-        self.ReportKeys= self.APPLICATIONCONFIG_DICTIONARY["ReportKeysVariables"]
-        self.ReportSortingKeys= self.APPLICATIONCONFIG_DICTIONARY["ReportSortingKeysVariables"]
         self.FIELDTRANSFORMS=self.APPLICATIONCONFIG_DICTIONARY["FieldTransforms"]
-        self.REPORTFIELDGROUP =self.APPLICATIONCONFIG_DICTIONARY["Report_Keys"]
+        self.REPORTFIELDGROUP =self.APPLICATIONCONFIG_DICTIONARY["Reports_Keys"]
         self.RACKOPTPARAMETERS =self.APPLICATIONCONFIG_DICTIONARY["RackOptimizationInputParameters"]
 
     def set_name(self,myname):
         self.name=myname
-        self.ReportFile = open(self.name, 'w')
+        self.ReportFile = open(self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOutputReports"]+"/"+self.name, 'w')
 
 
     def set_state(self,mystatus):
@@ -281,17 +293,24 @@ class report(parameters):
 
     def get_sorting_keys(self):
         try:
-            return eval("self."+self.ReportSortingKeys[self.ReportTypesList.index(self.ReportType)])
+            return eval("self."+self.ReportSortingKeysVariables[self.ReportTypesList.index(self.ReportType)])
         except:
             print("__ ERROR __ get_sorting_keys__ reporttype = {} List of vars = {}".format(
-                self.ReportType, self.ReportSortingKeys))
+                self.ReportType, self.ReportSortingKeysVariables))
 
     def get_keys(self):
-        try:
-            return eval("self."+self.ReportKeys[self.ReportTypesList.index(self.ReportType)])
-        except:
-            print("__ ERROR __ get_keys__ reporttype = {} List of vars = {}".format(
-                self.ReportType, self.ReportKeys))
+        #try:
+            index1=self.ReportTypesList.index(self.ReportType)
+            stringa2=""
+            stringa2="self."+self.ReportKeysVariables[index1]
+            return eval(stringa2)
+        #except:
+        #    print("STRING passed to eval from get_keys(): >{:}< ".format(stringa2))
+        #    print("__ ERROR __ get_keys__ reporttype = {:} List of vars = {}".format(
+        #        self.ReportType, self.ReportKeys))
+        #    print(self.ReportTypesList)
+        #    print(self.ReportType)
+        #    exit(-1)
 
     def UpdateLastRecordValueByKey(self, mykey, value):
         record= self.Report[len(self.Report)-1]
@@ -305,8 +324,7 @@ class report(parameters):
         MyFieldIndex=self.get_keys().index(mykey)
         for x in self.Report:
             if x[MyFieldIndex]==value:
-                return x
-            
+                return x           
         #print("ERROR Class report,FindRecordByKeyValue : record with value {:} not found in field with key {:} ".format(mykey,value))
         return []
 
@@ -427,22 +445,25 @@ class report(parameters):
             pars.myprint(color)
         
         print_keys_on_top_of_report(self)
+        
+        reportkeys=self.get_keys()
 
         for record in self.Report:
             myline = ''
             myformat = ''
 
+            currentrecord={}
             for row_itemnumber in range(self.keys_length()):
                 # Fetches each item in the report row into initialvalue and gets what type it is, and what's the length of the output record (FIELDLENGTH)
+
                 if row_itemnumber < len(record):
                     initialvalue = record[row_itemnumber]
                     mytype = type(initialvalue)
-                    if row_itemnumber >= self.keys_length():
-                        newelement = self.keys_length()-1
-                    else:
-                        newelement = row_itemnumber
+                    key=reportkeys[row_itemnumber]
+                    currentrecord[key]=record[row_itemnumber]
+                    newelement = row_itemnumber
                 else:
-                    initialvalue = '**'
+                    initialvalue = '!!'
                     mytype = string
                     newelement = row_itemnumber
 
@@ -458,7 +479,7 @@ class report(parameters):
                     if mytype == list:
                         tmpline = ''
                         tmpval=''
-                        #tmpline=" ".join(map(eval(transform),initialvalue))
+                            #tmpline=" ".join(map(eval(transform),initialvalue))
                         for x in initialvalue:
                             value = str(x)
                             tmpval += eval(transform)
@@ -467,9 +488,11 @@ class report(parameters):
                     else:
                         value = str(initialvalue)
                         myline += stringa1.format(eval(transform)[0:length])
-                        #myline += eval(transform) + " | "
+                            #myline += eval(transform) + " | "
                 except:
-                    myline += stringa2.format("## |")
+                    myline += stringa2.format("?? |")
+                    print(transform)
+                    eval(transform)
             
             pars.myprint("{:s}".format(myline))
             self.write_line_to_file("{:s}".format(myline))
@@ -478,11 +501,7 @@ class report(parameters):
             myline=self.ReportTotalUsage
             pars.myprint(myline)
             self.write_line_to_file("{:}".format(myline))
-
-
-
             
-
         return -1
 
     # SORT SOURCE REPORT IN ACCORDANCE TO SORTING KEYS
@@ -569,6 +588,14 @@ class report(parameters):
             return returnval
         except:
             return 0
+    
+
+    def show_as_percentage(self,numerator, denominator, len):
+            value_num=int(numerator)
+            value_den=int(denominator)
+            myvalue= int(100*value_num/value_den)
+            returnval = "{:>3s}".format(str(myvalue)+"%")
+            return returnval.rjust(len)
 
     # REMOVES DT_NIMS from AZ/hostaggs
     def shorten_hostaggs(self, x):
