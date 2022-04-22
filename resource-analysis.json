@@ -1,4 +1,22 @@
 {
+"Application_Parameters": 
+    {
+        "TIMESTAMP": "", 
+        "SOURCE_SITE_SUFFIX": "", 
+        "DESTINATION_SITE_SUFFIX": "", 
+        "SRCSITESLIST":[],
+        "DESTSITESLIST": [],
+        "SERVICE": [], 
+        "IGNOREHOSTAGS": false, 
+        "WIPE_DESTSITE": false, 
+        "BESTVMDISTRO": true, 
+        "DESTSCAN": false, 
+        "SILENTMODE": false, 
+        "AZREALIGN": "", 
+        "SKIPMGMTSITE": false, 
+        "OUTPUTTOFILE": false, 
+        "JUSTSOURCE": false
+    }, 
 "Files": 
     {   "PathForOpenstackFiles" : "./JSON",  
         "PathForOutputReports" : "./REPORTS", 
@@ -132,36 +150,18 @@
         "default": "value.rjust(length)"
     } ,
 
-    "Application_Parameters": 
-    {
-        "TIMESTAMP": "", 
-        "SUFFISSOSRC": "", 
-        "SUFFISSODST": "", 
-        "SERVICE": [], 
-        "IGNOREHOSTAGS": false, 
-        "DESTINATIONWIPE": false, 
-        "BESTVMDISTRO": true, 
-        "DESTSCAN": false, 
-        "DESTSITESLIST": [],
-        "SILENTMODE": false, 
-        "AZREALIGN": "", 
-        "SKIPMGMTSITE": false, 
-        "OUTPUTTOFILE": false, 
-        "JUSTSOURCE": true
-    }, 
+
 "Application_Visible_Parameters": 
     [ 
-    "SUFFISSOSRC", 
-    "SUFFISSODST", 
+    "SOURCE_SITE_SUFFIX", 
+    "DESTINATION_SITE_SUFFIX", 
     "SERVICE", 
     "IGNOREHOSTAGS",
-    "DESTINATIONWIPE", 
+    "WIPE_DESTSITE", 
     "BESTVMDISTRO", 
-    "DESTSCAN", 
     "SILENTMODE", 
     "AZREALIGN", 
     "SKIPMGMTSITE", 
-    "OUTPUTTOFILE", 
     "JUSTSOURCE"
     ]
     

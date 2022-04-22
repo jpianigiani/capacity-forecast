@@ -22,19 +22,13 @@ class parameters:
     MODE_OF_OPT_OPS = 0
     paramsdict={}
     paramslist=[]
-    #paramsdict = {'TIMESTAMP': '', 'SUFFISSOSRC': '', 'SUFFISSODST': '', 'SERVICE': [], 'IGNOREHOSTAGS': False,
-    #              'DESTINATIONWIPE': False, 'BESTVMDISTRO': True, 'DESTSCAN': False, 'DESTSITESLIST': [],
-    #              'SILENTMODE': False, 'AZREALIGN': '', 'SKIPMGMTSITE': False, 'OUTPUTTOFILE': False, 'JUSTSOURCE': False}
-
-    #paramslist = ('SUFFISSOSRC', 'SUFFISSODST', 'SERVICE', 'IGNOREHOSTAGS',
-    #              'DESTINATIONWIPE', 'BESTVMDISTRO', 'DESTSCAN', 'SILENTMODE', 'AZREALIGN', 'SKIPMGMTSITE', 'OUTPUTTOFILE', 'JUSTSOURCE')
 
     # -------------------------------------------------------------------------------------------------------------------------
     # FORMULAS FOR DISTANCE CALCULATION FROM TARGET
     # -------------------------------------------------------------------------------------------------------------------------
 
     # , 'abs(currentvalue-average)',  '(currentvalue-minimum)**4']
-    metricformulas = ['(currentvalue-average)**2']
+    #metricformulas = ['(currentvalue-average)**2']
     # -------------------------------------------------------------------------------------------------------------------------
     NO_OPTIMIZATION = 0
     OPTIMIZE_BY_CALC = 1
@@ -114,7 +108,7 @@ class parameters:
     def show_cli_command(self):
         MyLine = menu.OKGREEN+'{0:_^'+str(self.ScreenWitdh)+'}'
         self.myprint(MyLine.format('LIST OF PARAMETER ARGUMENTS'))
-        self.myprint(json.dumps(self.paramsdict,indent=22))
+        self.myprint(json.dumps(self.paramsdict,indent=40))
         # PRINT CLI COMMAND AND PARAMETERS USED
         CMD = "python3 resource-analysis.py"
         for x in self.paramsdict:
@@ -134,6 +128,40 @@ class parameters:
         CMD4 = CMD3.replace(", ", ",")
         self.myprint(CMD4)
         return True
+
+        # this function is used to fetch - for a suffix - the list of files to use 
+    def GetListOfFilesFromSuffixMatch(self,suffissotouse):
+            # ----------------------------------------------
+            # TRUE if site  == mgmt site
+        def IsItAMgmtSite(suffix):
+                if len(suffix)==14 or suffix[14:]=='ber800' or suffix[14:]=='stg810':
+                    return True
+                else:
+                    return False
+            # ----------------------------------------------
+
+        cleanlist=[]
+        ListOfFiles=os.listdir(self.PATHFOROPENSTACKFILES)
+
+        files_txt = [i for i in ListOfFiles if i.endswith('.json') and (i.find(suffissotouse)>-1 and (self.paramsdict["SKIPMGMTSITE"]==False or IsItAMgmtSite(i)==False))]
+        for Filename in files_txt:
+            for FileType in self.FILETYPES:
+                PositionInFilename=Filename.find(FileType)
+                if PositionInFilename>-1:
+                    value = Filename[PositionInFilename+len(FileType)+1:Filename.find('.json')]
+                    condition3= self.paramsdict["SKIPMGMTSITE"]==False or IsItAMgmtSite(value)==False
+                    if condition3:
+                        cleanlist.append(value)
+        cleandict=dict.fromkeys(cleanlist)
+        cleanlist=[]
+        cleanlist=list(cleandict)
+        if len(cleanlist)==0:
+            print("ERROR : no Openstack JSONs files found in folder... exiting")
+            exit(-1)
+        return(cleanlist)
+
+
+
 
 # --------------------EXTRACTS SITENAME FROM SUFFISSO note : STG810 specific parsing
     def parse_suffisso(self, suffisso):
@@ -204,7 +232,7 @@ class dictarray:
         os.system("clear")
         stringalinea1 = '{0:_^'+str(menu.ScreenWitdh)+'}'
         pars.myprint(stringalinea1.format(
-            " SERVICES AVAILABLE IN SITE "+pars.paramsdict["SUFFISSOSRC"]))
+            " SERVICES AVAILABLE IN SITE "+pars.paramsdict["SOURCE_SITE_SUFFIX"]))
         for x in sortedres:
             print("- {:2d} --- {:20s}".format(index, x))
             index += 1
@@ -265,7 +293,7 @@ class report(parameters):
         super().__init__()
         self.Report = []
         self.ReportType=0
-
+        self.State=''
         self.ReportTotalUsage = []
         self.name=str(self.__class__).replace("'",'').replace("<",'').replace(">","").replace("class ","") + hex(id(self))
         self.FIELDLENGTHS= self.APPLICATIONCONFIG_DICTIONARY["FieldLenghts"]
@@ -273,6 +301,11 @@ class report(parameters):
         self.FIELDTRANSFORMS=self.APPLICATIONCONFIG_DICTIONARY["FieldTransforms"]
         self.REPORTFIELDGROUP =self.APPLICATIONCONFIG_DICTIONARY["Reports_Keys"]
         self.RACKOPTPARAMETERS =self.APPLICATIONCONFIG_DICTIONARY["RackOptimizationInputParameters"]
+
+    def ClearData(self):      
+        self.Report = []
+        self.State=''
+        self.ReportTotalUsage = []
 
     def set_name(self,myname):
         self.name=myname
@@ -606,7 +639,6 @@ class report(parameters):
         value= x.replace("DT_NIMS_", "")
         return value
 
-
 class menu(parameters):
     # -------------------------------------------------------------------------------------------------------------------------
     # -------------------------------------------------------------------------------------------------------------------------
@@ -631,7 +663,7 @@ class menu(parameters):
     Default = '\033[99m'
 
     def __init__(self):
-        os.system(self.Black)
+
         screenrows, screencolumns = os.popen('stty size', 'r').read().split()
         self.ScreenWitdh = int(screencolumns)
 
@@ -720,7 +752,7 @@ class menu(parameters):
                     index += value
                     index = index % len(pagestarts)
                     goon = True
-                    os.system('sleep 0.5')
+                    os.system('sleep 0.2')
                 elif src == -99:
                     goon = False
                     print("\t\t\t\t ......... EXITING2 .........\n\n")

@@ -65,7 +65,7 @@ class vm_report(report):
     # -----------------------------------------------------------------------
     # Transforms dict array into REPORT array 2d - VM level - one line = 1 list = 1 VM 
     # -----------------------------------------------------------------------
-        SUFFISSO=pars.paramsdict["SUFFISSOSRC"]
+        SUFFISSO=pars.paramsdict["SOURCE_SITE_SUFFIX"]
 
         #if pars.paramsdict["SILENTMODE"]==False:
         #    pars.myprint("REPORT KEYS \n {:s} \n".format( json.dumps(self.get_keys())))
@@ -209,13 +209,11 @@ class menu_report(menu,report):
         self.SVCNOTTOSHOW = ("service", "admin", "tempest", "c_rally", "DeleteMe", "Kashif")
 
     
-
-    
     
     #--------------------------------------------------------------------
     # GET LIST OF FILES TO USE IN MENU
     #--------------------------------------------------------------------
-    def get_fileslist(self, params, prompt):
+    def ShowProjectsPerSiteandGetInput(self, params, prompt):
         MenuReport= menu_report()
         if True:
             cleanlist = []
@@ -298,37 +296,6 @@ class menu_report(menu,report):
     #
     def parse_args(self,input,output, src_da, dst_da):
         # ----------------------------------------------
-        # this function is used to fetch - for a suffix - the list of files to use 
-        def get_destfiles_to_scan():
-            # ----------------------------------------------
-            # TRUE if site  == mgmt site
-            def ismgmtsite(suffix):
-                if len(suffix)==14 or suffix[14:]=='ber800' or suffix[14:]=='stg810':
-                    return True
-                else:
-                    return False
-            # ----------------------------------------------
-
-            cleanlist=[]
-            files=os.listdir(output.PATHFOROPENSTACKFILES)
-
-            files_txt = [i for i in files if i.endswith('.json') and (i.find(output.paramsdict["SUFFISSODST"])>-1 and (output.paramsdict["SKIPMGMTSITE"]==False or ismgmtsite(i)==False))]
-            for x in files_txt:
-                for y in output.FILETYPES:
-                    p=x.find(y)
-                    if p>-1:
-                        value = x[p+len(y)+1:x.find('.json')]
-                        condition3= output.paramsdict["SKIPMGMTSITE"]==False or ismgmtsite(value)==False
-                        if condition3:
-                            cleanlist.append(value)
-            cleandict=dict.fromkeys(cleanlist)
-            cleanlist=[]
-            cleanlist=list(cleandict)
-            if len(cleanlist)==0:
-                print("ERROR : no Openstack JSONs files found in ./JSON folder.. exiting")
-                exit(-1)
-            return(cleanlist)
-
 
         # ----------------------------------------------------------
         # PARSE ARGUMENTS PASSED TO COMMAND
@@ -356,45 +323,59 @@ class menu_report(menu,report):
                         else:
                             output.paramsdict[key]=val
                 q+=1
-
         except: 
             print("ERROR - parse_args - The following command line parameter is not correct : {:s}".format(x))
             exit(-1)
         l+=1
 
-        # If SUFFISSOSRC CLI argument is not present, the User Interface fetching the input is shown and user input is returned to the parameters dict
-        if len(output.paramsdict["SUFFISSOSRC"])==0:
-            src_parname = "SUFFISSOSRC"
-            output.paramsdict[src_parname]=self.get_fileslist(output, "Source site")
-            # in order for the services in each site:suffix to be shown, the array of dicts with all the json must be loaded first
-            src_da.load_jsons_into_dictarrays(output,src_parname)
+        #SOURCE SITE(S)
+        # If SOURCE_SITE_SUFFIX CLI argument is not present, the User Interface fetching the input is shown and user input is returned to the parameters dict
+        parname = "SOURCE_SITE_SUFFIX"
+        Parname_Of_Sitelist="SRCSITESLIST"
+        MyPrompt="Source site"
+        output.paramsdict[Parname_Of_Sitelist]=[]
+        if len(output.paramsdict[parname])==0:
+            MySiteSuffixValue=self.ShowProjectsPerSiteandGetInput( output,MyPrompt)
+            output.paramsdict[parname]=MySiteSuffixValue
+            output.paramsdict[Parname_Of_Sitelist].append(MySiteSuffixValue)
         else:
-            src_parname = "SUFFISSOSRC"
-            src_da.load_jsons_into_dictarrays(output,src_parname)
+            myvaluetosearchfiles=output.paramsdict[parname]
+            for SiteFileSuffix in output.GetListOfFilesFromSuffixMatch(myvaluetosearchfiles):
+                output.paramsdict[Parname_Of_Sitelist].append(SiteFileSuffix)
+            output.paramsdict[parname]=output.paramsdict[Parname_Of_Sitelist][0]            
+            #MySiteSuffixValue=output.paramsdict[parname]
+        #output.paramsdict[parname]=MySiteSuffixValue
+        #output.SRCSITES.append(MySiteSuffixValue)
+        #output.paramsdict[Parname_Of_Sitelist].append(MySiteSuffixValue)
+        # in order for the services in each site:suffix to be shown, the array of dicts with all the json must be loaded first
+        src_da.load_jsons_into_dictarrays(output,parname)
 
-        if output.paramsdict["JUSTSOURCE"]==False:        
-            if len(output.paramsdict["SUFFISSODST"])==0:
-                output.paramsdict["SUFFISSODST"]=self.get_fileslist(output, "Destination site")
-                output.DSTSITES.append(output.paramsdict["SUFFISSODST"])
-            else:
-                    if output.paramsdict["DESTSCAN"]==True:
-                        for a in get_destfiles_to_scan():
-                            output.DSTSITES.append(a)
-                            output.paramsdict["DESTSITESLIST"].append(a)
-                            output.paramsdict["SUFFISSODST"]=output.DSTSITES[0]
-                    else:
-                        output.DSTSITES.append(output.paramsdict["SUFFISSODST"])
+        # DESTINATION SITES
+        parname = "DESTINATION_SITE_SUFFIX"
+        Parname_Of_Sitelist="DESTSITESLIST"
+        MyPrompt="Destination site"
+
+        output.paramsdict[Parname_Of_Sitelist]=[]        
+        if len(output.paramsdict[parname])==0:
+            MySiteSuffixValue=self.ShowProjectsPerSiteandGetInput(output, MyPrompt)
+            output.paramsdict[parname]=MySiteSuffixValue
+            output.paramsdict[Parname_Of_Sitelist].append(MySiteSuffixValue)
+        else:
+            myvaluetosearchfiles=output.paramsdict[parname]
+            for SiteFileSuffix in output.GetListOfFilesFromSuffixMatch(myvaluetosearchfiles):
+                output.paramsdict[Parname_Of_Sitelist].append(SiteFileSuffix)
+            output.paramsdict[parname]=output.paramsdict[Parname_Of_Sitelist][0]
             # in order for the services in each site:suffix to be shown, the array of dicts with all the json must be loaded first   
-            dst_parname = "SUFFISSODST"
-            dst_da.load_jsons_into_dictarrays(output,dst_parname)
+        dst_da.load_jsons_into_dictarrays(output,parname)
 
         # so that the name(s) of the Services can be either assigned or user selected
         if len(output.paramsdict["SERVICE"])==0:
-            src_da.load_jsons_into_dictarrays(output,src_parname)
+            parname = "SOURCE_SITE_SUFFIX"
+            src_da.load_jsons_into_dictarrays(output,parname)
             output.paramsdict["SERVICE"]=src_da.get_src_prj(output,self )
 
         output.myprint("------------------ LIST OF PARAMETER ARGUMENTS ---------------------------")	
-        output.myprint(json.dumps(output.paramsdict,indent=22))
+        output.myprint(json.dumps(output.paramsdict,indent=30))
 
         return l
     
@@ -450,7 +431,7 @@ class hw_report(report):
     # Produces a report (list of lists); one row per hardware compute based on the global ARRAY of (list,dict) passed as parameter. 
     # ---------------------------------------------------------------------------------------------------
     def produce_hw_report(self,SUFFISSO, pars, dst_dictarray_object ):
-            #SUFFISSO = pars.paramsdict["SUFFISSODST"]
+            #SUFFISSO = pars.paramsdict["DESTINATION_SITE_SUFFIX"]
             self.Report=[]
             TEMP_RES=[]
             #("TimeStamp", "Site", "Rack", "HypervisorHostname", "vCPUsAvailPerHV", "vCPUsUsedPerHV", "MemoryMBperHV", "MemoryMBUsedperHV", "AZ", "HostAggr")
@@ -474,8 +455,8 @@ class hw_report(report):
                 self.UpdateLastRecordValueByKey( "AZ",AGGS[0])               
                 self.UpdateLastRecordValueByKey( "HostAggr",AGGS[1:]) 
 
-                # DESTINATIONWIPE Parameter implementation
-                if pars.paramsdict["DESTINATIONWIPE"]==True and SUFFISSO==pars.paramsdict["SUFFISSODST"]:
+                # WIPE_DESTSITE Parameter implementation
+                if pars.paramsdict["WIPE_DESTSITE"]==True and SUFFISSO==pars.paramsdict["DESTINATION_SITE_SUFFIX"]:
                     self.UpdateLastRecordValueByKey( "vCPUsUsedPerHV",0)
                     self.UpdateLastRecordValueByKey( "MemoryMBUsedperHV",0)
                     EmptyVMList=[]
@@ -519,7 +500,7 @@ class hw_report(report):
     #----------------------        AUTOOPTIMIZE RACKS TO AZ ALLOCATION      -------------------------------
     #
     #------------------------------------------------------------------------------------------------------
-    def optimize_AZRealignment_in_HWReport(self, pars, MyRackReport,  metric_formula): #sort_formula,
+    def Hardware_Layout_Optimization_ByRackAndAZ(self, pars, MyRackReport,  metric_formula): #sort_formula,
         #self = class = Report. Reporttype=HW
 
     # CALCULATE THE DISTANCE FOR A VECTOR OF 5 RACKCOMBOS -- NEEDS TO BE PARAMETRIZABLE
@@ -552,11 +533,11 @@ class hw_report(report):
             #print(" ### DEBUG - no AZ realign parameter passed to select input file for Rack to AZ realignment")
             return self
         if len(self.Report)==0:
-            print("ERROR in optimize_AZRealignment_in_HWReport : length of HW report = 0 entries ")
+            print("ERROR in optimize_HW_OPTIMIZATION_MODEment_in_HWReport : length of HW report = 0 entries ")
             exit(-1)
         #print(self[0])
 
-        SUFFISSO = pars.paramsdict["SUFFISSODST"]
+        SUFFISSO = pars.paramsdict["DESTINATION_SITE_SUFFIX"]
         stringalinea1 = '{0:_^'+str(pars.ScreenWitdh)+'}'
 
         #Initialize and produce RACK REPORT . Initialize report for optimixzation results
@@ -583,7 +564,7 @@ class hw_report(report):
 
         NumberOfAZs = len(racks)/MyRackReport.RacksPerAZ
         if NumberOfAZs-math.floor(NumberOfAZs)>0:
-            print(" ERROR -- optimize_AZRealignment_in_HWReport : Number of racks is {:d} vs RacksPerAZ is {:d}".format(len(racks,MyRackReport.RacksPerAZ)))
+            print(" ERROR -- optimize_HW_OPTIMIZATION_MODEment_in_HWReport : Number of racks is {:d} vs RacksPerAZ is {:d}".format(len(racks,MyRackReport.RacksPerAZ)))
             exit(-1)
         #UsageLoadForCurrentRackToAZPerm = list of per AZ total of VCPUs: passed as param to Calculate_UsageSymmetry_ofLoadPerAZ func to calculate sigma2
         #for x in range(len(racks)/MyRackReport.RacksPerAZ):
@@ -661,7 +642,7 @@ class hw_report(report):
             retval=self.after_opt_realign_racks_to_optimizedAZdistro_inHWReport(MyRackReport)
         except :
             print(sys.exc_info())
-            print("ERROR in optimize_AZRealignment_in_HWReport : Exiting")
+            print("ERROR in optimize_HW_OPTIMIZATION_MODEment_in_HWReport : Exiting")
             exit(-1)
         return returnarray
     # UPDATE HW_REPORT WITH NEW VALUES OF RACKS , BASED on NEW AZ TO RACK MAPPING 
@@ -786,28 +767,28 @@ class rack_report(report):
 
     #--------------------------------------- PROCEDURE TO REALIGN AZ based on EXTERNALLY PROVIDED JSON FILE    -----------------------------
     def realignAZinhwreport(self,pars,dst_report):
-        if len(pars.paramsdict["AZREALIGN"])==0:
+        if len(pars.paramsdict["HW_OPTIMIZATION_MODE"])==0:
             #print(" ### DEBUG - no AZ realign parameter passed to select input file for Rack to AZ realignment")
             return dst_report
         try:
-            FILENAME=pars.PATHFOROUTPUTREPORTS+'/azrealign_targetracklayout_'+pars.paramsdict["AZREALIGN"]+".json"
+            FILENAME=pars.PATHFOROUTPUTREPORTS+'/HW_OPTIMIZATION_MODE_targetracklayout_'+pars.paramsdict["HW_OPTIMIZATION_MODE"]+".json"
             with open(FILENAME,'r') as file1:
-                AZRealign=json.load(file1)
-                pars.myprint( json.dumps(AZRealign, indent=22))
+                HW_OPTIMIZATION_MODE=json.load(file1)
+                pars.myprint( json.dumps(HW_OPTIMIZATION_MODE, indent=22))
         except (IOError,EOFError) as e:
-            print(" ERROR - file {:s} not found for Rack to AZ realignment".format(pars.paramsdict["AZREALIGN"]))
+            print(" ERROR - file {:s} not found for Rack to AZ realignment".format(pars.paramsdict["HW_OPTIMIZATION_MODE"]))
             exit(1)
 
-        sitename = pars.parse_suffisso(pars.paramsdict["SUFFISSODST"])
+        sitename = pars.parse_suffisso(pars.paramsdict["DESTINATION_SITE_SUFFIX"])
         try:
-            NEWAZMAP=dict(AZRealign[sitename])
-            #print("DEBUG azrealign2:",json.dumps(NEWAZMAP,indent=22))
+            NEWAZMAP=dict(HW_OPTIMIZATION_MODE[sitename])
+            #print("DEBUG HW_OPTIMIZATION_MODE2:",json.dumps(NEWAZMAP,indent=22))
         except (KeyError) as e:
-            print(" --- ERROR : in file {:s} for AZ realignment, the site {:s} has no data for AZ realignment: Rack to AZ mapping is therefore unchanged!".format(MyPARAMSDICT.paramsdict["AZREALIGN"],sitename))
+            print(" --- ERROR : in file {:s} for AZ realignment, the site {:s} has no data for AZ realignment: Rack to AZ mapping is therefore unchanged!".format(MyPARAMSDICT.paramsdict["HW_OPTIMIZATION_MODE"],sitename))
             return(dst_report)
         newracktoazmap={}
-        for i in range(len(AZRealign[sitename]["rackslayout"])):
-            racknum=AZRealign[sitename]["rackslayout"][i]
+        for i in range(len(HW_OPTIMIZATION_MODE[sitename]["rackslayout"])):
+            racknum=HW_OPTIMIZATION_MODE[sitename]["rackslayout"][i]
             aznum=int(i/2)+1
             azname = "DT_NIMS_AZ"+str(aznum)
             newracktoazmap[racknum]=azname
@@ -818,7 +799,7 @@ class rack_report(report):
             RACKINREP=int(ITEM[dst_report.get_keys().index("Rack")])
             ITEM[dst_report.get_keys().index("AZ")]= newracktoazmap[str(RACKINREP)]
 
-        return AZRealign[sitename]["rackslayout"]
+        return HW_OPTIMIZATION_MODE[sitename]["rackslayout"]
             #print("DEBUG3 - ", newracktoazmap[str(RACKINREP)])
     #        for NEWITEM in NEWAZMAP:
     #            if RACKINREP in NEWAZMAP.get(NEWITEM):
@@ -828,9 +809,9 @@ class rack_report(report):
 
     # --------------------------- WRITE OPTIMIZED RACK LAYOUT TO FILE
     def writeoptimizedrackstofile(self, pars):
-        FILENAME=pars.PATHFOROUTPUTREPORTS+'/'+'azrealign_targetracklayout_'+'OUTPUT'+'.json'
+        FILENAME=pars.PATHFOROUTPUTREPORTS+'/'+'HW_OPTIMIZATION_MODE_targetracklayout_'+'OUTPUT'+'.json'
         memorydict=self.OUTPUTDICT
-        suffix=pars.paramsdict["SUFFISSODST"]
+        suffix=pars.paramsdict["DESTINATION_SITE_SUFFIX"]
         if len(memorydict)==0:
             pars.myprint("WARNING writeoptimizedrackstofile: no data in optimized rack layout dict: skipping appending data to {} ".format(FILENAME))
             return False
@@ -869,7 +850,7 @@ class totalresults_report(report):
 
 
 
-        destsitename = pars.parse_suffisso(pars.paramsdict["SUFFISSODST"])
+        destsitename = pars.parse_suffisso(pars.paramsdict["DESTINATION_SITE_SUFFIX"])
         MODE_OF_OPT_OPS = pars.get_azoptimization_mode()
         
         # Now check if instantiation fits in the newly adjusted report
@@ -961,8 +942,8 @@ class totalresults_report(report):
         TotalRepoKeys=self.get_keys()
         MyRecord=self.addemptyrecord()
         MyRecord[TotalRepoKeys.index("Capacity-fits")]=vmfits
-        MyRecord[TotalRepoKeys.index("SourceSuffix")]=pars.paramsdict["SUFFISSOSRC"]
-        MyRecord[TotalRepoKeys.index("DestinationSuffix")]=pars.paramsdict["SUFFISSODST"]
+        MyRecord[TotalRepoKeys.index("SourceSuffix")]=pars.paramsdict["SOURCE_SITE_SUFFIX"]
+        MyRecord[TotalRepoKeys.index("DestinationSuffix")]=pars.paramsdict["DESTINATION_SITE_SUFFIX"]
         MyRecord[TotalRepoKeys.index("Service")]=pars.paramsdict["SERVICE"]
         MyRecord[TotalRepoKeys.index("vCPU_Load_after")]=OverallVCPULoad
 
