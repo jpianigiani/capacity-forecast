@@ -7,6 +7,7 @@ import itertools
 import math
 import operator
 from   datetime import datetime
+from operator import itemgetter, attrgetter
 from mycapacitymodule import *
 
 class vm_report(report):
@@ -300,19 +301,19 @@ class menu_report(menu,report):
         # ----------------------------------------------------------
         # PARSE ARGUMENTS PASSED TO COMMAND
         # ----------------------------------------------------------
-        q=0
+        Counter=0
         l=0
         try:
             # First all command line arguments are parsed into a  dict (based on their type)
-            for x in input:
-                if q>0:
-                    if x.find("=")==-1:
+            for Word in input:
+                if Counter>0:
+                    if Word.find("=")==-1:
                         key=output.paramslist[l]
-                        value=x
+                        value=Word
                         l+=1
                     else:
-                        key=x.split("=")[0]
-                        val=x.split("=")[1]
+                        key=Word.split("=")[0]
+                        val=Word.split("=")[1]
                         if type(output.paramsdict[key]) is bool:
                             output.paramsdict[key]=val.upper()=='TRUE'
                             #print(MyPARAMSDICT.paramsdict[key])
@@ -322,7 +323,7 @@ class menu_report(menu,report):
                                 output.paramsdict[key].append(y)
                         else:
                             output.paramsdict[key]=val
-                q+=1
+                Counter+=1
         except: 
             print("ERROR - parse_args - The following command line parameter is not correct : {:s}".format(x))
             exit(-1)
@@ -350,23 +351,25 @@ class menu_report(menu,report):
         # in order for the services in each site:suffix to be shown, the array of dicts with all the json must be loaded first
         src_da.load_jsons_into_dictarrays(output,parname)
 
-        # DESTINATION SITES
-        parname = "DESTINATION_SITE_SUFFIX"
-        Parname_Of_Sitelist="DESTSITESLIST"
-        MyPrompt="Destination site"
 
-        output.paramsdict[Parname_Of_Sitelist]=[]        
-        if len(output.paramsdict[parname])==0:
-            MySiteSuffixValue=self.ShowProjectsPerSiteandGetInput(output, MyPrompt)
-            output.paramsdict[parname]=MySiteSuffixValue
-            output.paramsdict[Parname_Of_Sitelist].append(MySiteSuffixValue)
-        else:
-            myvaluetosearchfiles=output.paramsdict[parname]
-            for SiteFileSuffix in output.GetListOfFilesFromSuffixMatch(myvaluetosearchfiles):
-                output.paramsdict[Parname_Of_Sitelist].append(SiteFileSuffix)
-            output.paramsdict[parname]=output.paramsdict[Parname_Of_Sitelist][0]
-            # in order for the services in each site:suffix to be shown, the array of dicts with all the json must be loaded first   
-        dst_da.load_jsons_into_dictarrays(output,parname)
+        if output.paramsdict["JUSTSOURCE"]==False:
+            # DESTINATION SITES
+            parname = "DESTINATION_SITE_SUFFIX"
+            Parname_Of_Sitelist="DESTSITESLIST"
+            MyPrompt="Destination site"
+
+            output.paramsdict[Parname_Of_Sitelist]=[]        
+            if len(output.paramsdict[parname])==0:
+                MySiteSuffixValue=self.ShowProjectsPerSiteandGetInput(output, MyPrompt)
+                output.paramsdict[parname]=MySiteSuffixValue
+                output.paramsdict[Parname_Of_Sitelist].append(MySiteSuffixValue)
+            else:
+                myvaluetosearchfiles=output.paramsdict[parname]
+                for SiteFileSuffix in output.GetListOfFilesFromSuffixMatch(myvaluetosearchfiles):
+                    output.paramsdict[Parname_Of_Sitelist].append(SiteFileSuffix)
+                output.paramsdict[parname]=output.paramsdict[Parname_Of_Sitelist][0]
+                # in order for the services in each site:suffix to be shown, the array of dicts with all the json must be loaded first   
+            dst_da.load_jsons_into_dictarrays(output,parname)
 
         # so that the name(s) of the Services can be either assigned or user selected
         if len(output.paramsdict["SERVICE"])==0:
@@ -459,6 +462,8 @@ class hw_report(report):
                 if pars.paramsdict["WIPE_DESTSITE"]==True and SUFFISSO==pars.paramsdict["DESTINATION_SITE_SUFFIX"]:
                     self.UpdateLastRecordValueByKey( "vCPUsUsedPerHV",0)
                     self.UpdateLastRecordValueByKey( "MemoryMBUsedperHV",0)
+                    self.UpdateLastRecordValueByKey( "PctUsageOfCmpt",0)
+
                     EmptyVMList=[]
                     self.UpdateLastRecordValueByKey( "ExistingVMs",EmptyVMList) 
                 else:
@@ -466,7 +471,7 @@ class hw_report(report):
                     self.UpdateLastRecordValueByKey( "MemoryMBUsedperHV",item["Memory MB Used"])  
                     #self.UpdateLastRecordValueByKey( "ExistingVMs",WHATTODO??)               
                     self.UpdateLastRecordValueByKey( "ExistingVMs",dst_dictarray_object.get_vms_by_computenode(nodo)) 
-
+                    self.UpdateLastRecordValueByKey( "PctUsageOfCmpt",int(100*(item["vCPUs Used"]/item["vCPUs"])))
                 EmptyVMList=[]
                 self.UpdateLastRecordValueByKey( "NewVMs",EmptyVMList) 
 
@@ -691,8 +696,6 @@ class rack_report(report):
         self.ScreenWitdh=int(screencolumns)
         self.RackReportKeyForOptimizationMetric=self.RACKOPTPARAMETERS["KeyForCalculatingRackOptimization"]
 
-
-
     def produce_rack_report(self, pars, hwreportbox):
         stringalinea1 = '{0:_^'+str(pars.ScreenWitdh)+'}'
 
@@ -863,7 +866,7 @@ class totalresults_report(report):
         HOSTAGGRLIST = []
 
         # SORT VMs TO BE 'INSTANTIATED' by Project, VNF, VNFC
-        SourceReportSortKeys = ["Project", "vnfname", "vnfcname"]
+        SourceReportSortKeys = ["Project", "AZ", "vnfname", "vnfcname"]
         SRC_REPORTBOX.sort_report(SourceReportSortKeys)
 
         SrcvCPUsUSedPerVMIndex = SRC_REPORTBOX.get_keys().index("vCPUsUSedPerVM")
@@ -880,6 +883,7 @@ class totalresults_report(report):
         DstAZIndex = DST_REPORTBOX.get_keys().index("AZ")
         DstHostAggrIndex = DST_REPORTBOX.get_keys().index("HostAggr")
         DstNewVMsIndex = DST_REPORTBOX.get_keys().index("NewVMs")
+        DstPctUsageIndex = DST_REPORTBOX.get_keys().index("PctUsageOfCmpt")
 
         # CLEAR NEW VMs on DST REPORT
         for dstcmp in DST_REPORTBOX.Report:
@@ -897,16 +901,30 @@ class totalresults_report(report):
             VM_HOSTAGGRSET = set(srcvm[SrcHostAggrIndex])
             VM_HOSTAGGRLIST = list(HOSTAGGRSET)
             VM_HOSTAGGR = srcvm[SrcTargetHostAggrIndex]
-
+            #print("DEBUG {:}............ ".format(srcvm))
             # SORT COMPUTES BY LEAST USED VCPU
-            if pars.paramsdict["BESTVMDISTRO"]:
-                sorted(DST_REPORTBOX.Report,
-                       key=lambda x: x[DST_REPORTBOX.get_keys().index("vCPUsUsedPerHV")])
+            #if pars.paramsdict["BESTVMDISTRO"]:
+            #    mykeys="vCPUsUsedPerHV"
+            #    DST_REPORTBOX.sort_report(mykeys)
+                #for i in range (1):
+                #    print(" DEBUG 1 - check_capacity_and_produce_Total_Report- sorted ")
+                #    print(DST_REPORTBOX.Report[i])
+            for dstcmp in DST_REPORTBOX.Report:
+                hwcpu_total = dstcmp[DstvCPUAvailIndex]
+                hwram_total = dstcmp[DstMemoryMBperHVIndex]
+                hwcpu_used = dstcmp[DstvCPUsUsedPerHVIndex]
+                hwram_used = dstcmp[DstMemoryMBUsedperHVIndex]
+                dstcmp[DstPctUsageIndex]=int(100*(hwcpu_used/hwcpu_total))
+            #sorted(DST_REPORTBOX.Report,key=lambda x: x[DstPctUsageIndex], reverse=False)
+            sorted(DST_REPORTBOX.Report, key=itemgetter(DstAZIndex,DstPctUsageIndex))
 
             vmfits = False
             result = []
 
             for dstcmp in [x for x in DST_REPORTBOX.Report if hostaggr_match(pars, VM_HOSTAGGR, x[DstHostAggrIndex]) and VM_AZ in x[DstAZIndex]]:
+                #print("2 - check_capacity_and_produce_Total_Report ")
+                #print("{:}............ ".format(dstcmp))
+
                 hwcpu_total = dstcmp[DstvCPUAvailIndex]
                 hwram_total = dstcmp[DstMemoryMBperHVIndex]
                 hwcpu_used = dstcmp[DstvCPUsUsedPerHVIndex]
@@ -920,6 +938,7 @@ class totalresults_report(report):
                             DST_REPORTBOX.split_vnfname(VM_VMNAME, "vnf-vnfc")))
 
                         vmfits = True
+   
                         break
                     except:
                         print("DSTCMP Record:\n{:}".format(dstcmp))

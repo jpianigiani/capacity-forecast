@@ -34,7 +34,7 @@ class parameters:
     OPTIMIZE_BY_CALC = 1
     OPTIMIZE_BY_FILE = 2
 
-    DSTSITES = []
+
 
     def __init__(self):
         now = datetime.now()  # current date and time
@@ -45,6 +45,7 @@ class parameters:
         self.DSTSITES = []
         screenrows, screencolumns = os.popen('stty size', 'r').read().split()
         self.ScreenWitdh = int(screencolumns)
+        self.ColorsList =(menu.OKBLUE,menu.OKCYAN,menu.OKGREEN,menu.WARNING,menu.FAIL,menu.White,menu.Yellow,menu.Magenta,menu.Grey) 
 
         #try:
 
@@ -96,10 +97,10 @@ class parameters:
     # NO_OPTIMIZATION = 0
     # OPTIMIZE_BY_CALC = 1
     # OPTIMIZE_BY_FILE = 2
-        if len(self.paramsdict["AZREALIGN"]) == 0:
+        if len(self.paramsdict["HW_OPTIMIZATION_MODE"]) == 0:
             MODE_OF_OPT_OPS = self.NO_OPTIMIZATION
         else:
-            if self.paramsdict["AZREALIGN"].find('OPTIMIZE') > -1:
+            if self.paramsdict["HW_OPTIMIZATION_MODE"].find('OPTIMIZE') > -1:
                 MODE_OF_OPT_OPS = self.OPTIMIZE_BY_CALC
             else:
                 MODE_OF_OPT_OPS = self.OPTIMIZE_BY_FILE
@@ -526,6 +527,7 @@ class report(parameters):
                     myline += stringa2.format("?? |")
                     print(transform)
                     eval(transform)
+
             
             pars.myprint("{:s}".format(myline))
             self.write_line_to_file("{:s}".format(myline))
@@ -539,13 +541,15 @@ class report(parameters):
 
     # SORT SOURCE REPORT IN ACCORDANCE TO SORTING KEYS
     def sort_report(self, sortkeys):
-        try:
+        #try:
             reportkeys = self.get_keys()
             mykeys = []
             myfunc = ''
             for m in sortkeys:
+                #print("DEBUG SORT REPORT self= :m=",self, m)
                 # GET THE INDEX OF EACH ITEM IN SORTINGKEYs
                 val = reportkeys.index(m)
+
                 mykeys.append('x['+str(val)+']')
             myfunc = ",".join(mykeys)
             # print(myfunc)
@@ -553,10 +557,10 @@ class report(parameters):
             # print(len(reportkeys))
 
             self.Report.sort(key=lambda x: eval(myfunc))
-        except:
-            print("SORT_REPORT: Sorting Keys = {:} \nKeys = {:}".format(
-                sortkeys, reportkeys))
-            return -1
+        #except:
+        #    print("SORT_REPORT: \nSorting Keys = {:} \nReport Keys = {:}\n".format(
+        #        sortkeys, reportkeys))
+        #    return -1
 
     # CLASS REPORT General
     def calculate_report_total_usage(self, pars):
@@ -661,6 +665,8 @@ class menu(parameters):
     Grey = '\033[90m'
     Black = '\033[90m'
     Default = '\033[99m'
+
+    ColorsList =(OKBLUE,OKCYAN,OKGREEN,WARNING,FAIL,White,Yellow,Magenta,Grey)
 
     def __init__(self):
 

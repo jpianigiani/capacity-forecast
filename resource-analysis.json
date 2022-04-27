@@ -10,12 +10,11 @@
         "IGNOREHOSTAGS": false, 
         "WIPE_DESTSITE": false, 
         "BESTVMDISTRO": true, 
-        "DESTSCAN": false, 
         "SILENTMODE": false, 
-        "AZREALIGN": "", 
+        "HW_OPTIMIZATION_MODE": "", 
         "SKIPMGMTSITE": false, 
         "OUTPUTTOFILE": false, 
-        "JUSTSOURCE": false
+        "JUSTSOURCE": true
     }, 
 "Files": 
     {   "PathForOpenstackFiles" : "./JSON",  
@@ -34,6 +33,7 @@
         "vCPUsUsedPerHV": 4, 
         "MemoryMBperHV": 7,
         "MemoryMBUsedperHV": 7, 
+        "TotalUsageIndex": 5,
         "AZ": 3, 
         "HostAggr": 6,
         "Project": 14, 
@@ -93,7 +93,7 @@
                 "Lineup","vnfname", "vnfcname", "Warning"
             ],
         "VM_Report_Sorting_Keys" : 
-            ["Project" , "AZ", "HypervisorHostname","vnfname", "vnfcname" , "Flavor"],
+            ["Project" , "AZ", "HypervisorHostname", "vnfname", "vnfcname" , "Flavor"],
         "MENU_Report_Keys":
             ["Item","Site","Date","Suffix","Projects" ],
         "MENU_Report_Sorting_Keys":
@@ -112,8 +112,8 @@
         "REPORTTOTALS_Report_Sorting_Keys":["TotalVCPUs"],
         "TOTALRESULTS_Report_keys": ["Capacity-fits","SourceSuffix", "DestinationSuffix","Service","vCPU_Load_after","Outcome"],
         "TOTALRESULTS_Report_Sorting_Keys":     ["Capacity-fits"]
-    }
-    ,
+    },
+
 
 "FieldTransforms" : 
     {
@@ -160,7 +160,7 @@
     "WIPE_DESTSITE", 
     "BESTVMDISTRO", 
     "SILENTMODE", 
-    "AZREALIGN", 
+    "HW_OPTIMIZATION_MODE", 
     "SKIPMGMTSITE", 
     "JUSTSOURCE"
     ]

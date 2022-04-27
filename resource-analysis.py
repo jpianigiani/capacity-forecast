@@ -42,8 +42,6 @@ def main(arguments):
     # PARSE CLI COMMAND ARGUMENTS INTO PARAMETERS DICTIONARY
     UIMODE=MyMENU.parse_args(arguments, MyPARAMSDICT,SRC_DA, DST_DA)
 
-
-
     # CREATE SOURCE VM REPORT
     for CURRENTSRCSITE in MyPARAMSDICT.paramsdict["SRCSITESLIST"]:
         SRC_VM_REPORTBOX.ClearData()
@@ -199,10 +197,11 @@ def main(arguments):
             
             
 
-    # Print Total Report of Results
-    stringa1 = MyLine.format(menu.FAIL+"  SUMMARY OF RESULTS "+menu.Yellow)
-    MyPARAMSDICT.myprint(MyLine.format(stringa1))
-    FINAL_REPORTBOX.print_report(MyPARAMSDICT)
+        # Print Total Report of Results
+        
+            stringa1 = MyLine.format(menu.FAIL+"  SUMMARY OF RESULTS "+menu.Yellow)
+            MyPARAMSDICT.myprint(MyLine.format(stringa1))
+            FINAL_REPORTBOX.print_report(MyPARAMSDICT)
     # SHOW Parameters dump plus CLI command for subsequent executions via CLI command          
     MyPARAMSDICT.show_cli_command()
 
