@@ -233,9 +233,10 @@ class dictarray:
         for ServiceName in sortedres:
             print("- {:2d} --- {:20s}".format(index, ServiceName))
             index += 1
-
-        src = str(input("Enter source SERVICES separated by <space>:"))
-        print(src)
+        src=""
+        
+        while len(src)==0: 
+            src = str(input("Enter source SERVICES separated by <space>:"))
         res = []
         if src.upper().find("ALL")>-1:
             res = [i for i in sortedres]

@@ -5,8 +5,10 @@ import glob
 import os
 import itertools
 import math
+import re
 import operator
 from   datetime import datetime
+import time
 from operator import itemgetter, attrgetter
 from mycapacitymodule import *
 
@@ -206,6 +208,9 @@ class vm_report(report):
             retval.append(errmsg)
         self.ReportTotalUsage=retval
         return retval
+
+
+
 class menu_report(report):
 
     def __init__(self):
@@ -221,18 +226,10 @@ class menu_report(report):
         self.ScreenWitdh=int(screencolumns)
         self.SVCNOTTOSHOW = ("service", "admin", "tempest", "c_rally", "DeleteMe", "Kashif")
 
-        self.UILIST = []
-        self.SitesPerPageToShow = 18
-        self.PerSiteWidth = 20
-        self.WidthOfEachProjectName = 30
-        self.RemainingWidthForProjectsinSite = 61
     
-    #--------------------------------------------------------------------
-    # GET LIST OF FILES TO USE IN MENU
-    #--------------------------------------------------------------------
-    def ShowProjectsPerSiteandGetInput(self, params, prompt):
-        #MenuReport= menu_report()
-        if True:
+
+    def CreatePerSiteProjectReport(self, params):
+            
             cleanlist = []
             sortedlist=[]
             files = os.listdir(params.PATHFOROPENSTACKFILES)
@@ -243,6 +240,7 @@ class menu_report(report):
                     p = FileName.find(FileTypeName)
                     if p > -1:
                         cleanlist.append(FileName[p+len(FileTypeName)+1:FileName.find('.json')])
+                    
             cleandict = dict.fromkeys(cleanlist)
             cleanlist = []
             cleanlist = list(cleandict)
@@ -272,60 +270,57 @@ class menu_report(report):
                 self.UpdateLastRecordValueByKey("Date",ShortDate)
                 self.UpdateLastRecordValueByKey("Suffix",FileName)  
                 self.UpdateLastRecordValueByKey("Projects",self.load_svcs_by_prefix(params,FileName)) 
-
-
-        # SORT THE LIST OF SITE:DATE files (by suffixes)  by DATE+SITENAME
-
-            #sortedlist = sorted(newlist, key=lambda x: x[2]+x[1], reverse=True)
             index = 0 
             self.Report.sort(key=lambda x: x[DateIndex]+x[SiteIndex], reverse=True)
             for Rec in self.Report:
                 Rec[ProgNumIndex]=index
                 index+=1
 
-        # PREPARE THE LIST OF ITEMS
-            ShowLine = False
-            oldsitename=""
-            for Record in self.Report :
-                counter = Record[ProgNumIndex]
-                sitename = Record[SiteIndex]
-                if sitename != oldsitename:
-                    ShowLine=True
-
-                shortdate = Record[DateIndex]
-                filesuffix = Record[SuffixIndex]
-                ListOfProjectsPerSite =  Record[ProjectsIndex]
-               
-
-                PerSiteHeader = "  {:2d} - {:6s} - {:10s} - ".format(counter, sitename, shortdate)
-                line = ""
-                linelen = 0
-                self.PerSiteWidth = len(PerSiteHeader)
 
 
-                for ProjectInThisSite in ListOfProjectsPerSite:
-                    ProjectName="{0:"+str(self.WidthOfEachProjectName)+"}"
-                    item = ProjectName.format(ProjectInThisSite[0:self.WidthOfEachProjectName])
-                    linelen += len(item)
-                    line += item
-                    remaining_space=self.ScreenWitdh - linelen
-                    
-                    prjspersite="\n{0:"+str(self.PerSiteWidth+1)+"s}"
-                    if linelen > self.ScreenWitdh-self.PerSiteWidth-self.WidthOfEachProjectName:
-                        line += prjspersite.format(" ")
-                        linelen = 0
-                string2 = "{:s}".format(line)
+    #--------------------------------------------------------------------
+    # GET LIST OF FILES TO USE IN MENU
+    #--------------------------------------------------------------------
+    def ShowProjectsPerSiteandGetInput(self, params, prompt):
 
-                stringa3 = "{:s} {:s}".format(PerSiteHeader, string2)
+        self.CreatePerSiteProjectReport(params)
+        ReportKeys =self.get_keys()
+        ProgNumIndex =ReportKeys.index("Item")
+        SiteIndex =ReportKeys.index("Site")
+        DateIndex = ReportKeys.index("Date")
+        SuffixIndex =ReportKeys.index("Suffix")
+        ProjectsIndex =ReportKeys.index("Projects")
+        EachProjectLength = ListItemLen =self.FIELDLISTSITEMSLENGTH[self.FIELDLISTS.index("Projects")]
+    # PREPARE THE LIST OF ITEMS
+        for Record in self.Report :
+            counter = Record[ProgNumIndex]
+            sitename = Record[SiteIndex]
+            shortdate = Record[DateIndex]
+            filesuffix = Record[SuffixIndex]
+            ListOfProjectsPerSite =  Record[ProjectsIndex]
+            PerSiteHeader = "  {:2d} - {:6s} - {:10s} - ".format(counter, sitename, shortdate)
+            line = ""
+            linelen = 0
+            self.PerSiteWidth = len(PerSiteHeader)
+            for ProjectInThisSite in ListOfProjectsPerSite:
+                ProjectName="{0:"+str(EachProjectLength)+"}"
+                item = ProjectName.format(ProjectInThisSite[0:EachProjectLength])
+                linelen += len(item)
+                line += item
+                remaining_space=self.ScreenWitdh - linelen
+                
+                prjspersite="\n{0:"+str(self.PerSiteWidth+1)+"s}"
+                if linelen > self.ScreenWitdh-self.PerSiteWidth-EachProjectLength:
+                    line += prjspersite.format(" ")
+                    linelen = 0
+            string2 = "{:s}".format(line)
 
-                TMPREC = []
-                TMPREC.append(stringa3)
-                self.UILIST.append(TMPREC)
-                index += 1
+            stringa3 = "{:s} {:s}".format(PerSiteHeader, string2)
+
+            TMPREC = []
+            TMPREC.append(stringa3)
 
         return self.print_menu(params,prompt)
-
-
 
     # ----------------------------------------------------------
     # - ----- PARSE ARGS AND DEFINE LEVEL OF USER INTERACTIVITY -------
@@ -462,11 +457,6 @@ class menu_report(report):
 
     # PRINTS THE USER INTERACTIVE MENU PREPARED IN get_fileslist()
     def print_menu(self, params, prompt):
-        # PRINT LIST OF ITEMS BY PAGE
-        #self.print_report(params)
-        #exit(-1)
-
-
         FormatString_AllSpaces = '{0: ^'+str(self.ScreenWitdh)+'}'
         FormatString_AllDots = '{0:.^'+str(self.ScreenWitdh)+'}'
         rowindex = 0
@@ -477,7 +467,7 @@ class menu_report(report):
         DateIndex = self.get_keys().index("Date")
         PreviousDate=self.Report[0][DateIndex]
         pagestarts.append(0)
-
+        # SETS STARTING AND ENDING RECORD IN REPORT BY TIMESTAMP DATE - one page per date
         for RecordNum in range(len(self.Report )):
             CurrentDate=self.Report[RecordNum][DateIndex]
             if CurrentDate!=PreviousDate:
@@ -503,49 +493,52 @@ class menu_report(report):
                 self.print_report_line(params,self.Report[rowindex])
 
             print(FormatString_AllSpaces.format(''))
-
+            
             PAGEBACK = ['-', '_', 'b', 'B']
             try:
                 print(
-                    "\n\t\t\t--------- Previous Page : -,_,b; next page: any other  letter; <Enter> to exit :")
+                    "\nTo change page:\n\t\t\t-Previous Page : -,_,b,B; \n\t\t\t-Next page: any other  letter; \n\t\t\t-Exit: type END :")
                 userinput = input(
                     "\n\t\t\t--------- Enter {:s} suffix: ".format(prompt))
-                ISNUMBER = userinput.isdigit()
-                ISALPHA = userinput.isalpha()
+                ISNUMBER = userinput.isdigit()               
                 ISNULL = len(userinput) == 0
-                if ISNUMBER and ISNULL == False:
+                ISQUIT = userinput.upper().find("END")>-1
+                if ISNULL:
+                    goon=True
+
+                if ISQUIT:
+                    goon = False
+                    print("\n\t\t\t\t ......... EXITING .........\n\n")
+                    exit(-1)
+
+                if ISNUMBER:
                     src = int(userinput)
-                if ISNUMBER == False and ISNULL == False or ISALPHA:
-                    src = -1
+                    if src >= pagestarts[index] and src <= pageends[index]:
+                        print(
+                            "\t\t\t\t ......... INPUT ACCEPTED {:d}.........\n\n".format(src))
+                        retval = self.Report[src][3]
+                        print(
+                            "\t\t\t\t\t ---------- USER INPUT=>{:s}<--".format(retval))
+                        goon = False
+                        return retval
+                    else:
+                        print(
+                            "\n\t\t\t\t ......... Please enter a number between {:d} and {:d} \n\n".format(pagestarts[index], pageends[index]-1))
+                        time.sleep(1.0)
+                else:
                     if userinput in PAGEBACK:
                         value = -1
+                        DisplayString="PREVIOUS"
                     else:
                         value = 1
+                        DisplayString="NEXT"
 
-                if ISNULL:
-                    src = -99
-
-                if src >= 0 and src < pageends[index]:
-                    print(
-                        "\t\t\t\t ......... INPUT ACCEPTED {:d}.........\n\n".format(src))
-                    retval = self.Report[src][3]
-                    print(
-                        "\t\t\t\t\t ---------- USER INPUT=>{:s}<--".format(retval))
-                    goon = False
-                    return retval
-                elif src == -1:
-                    if value == 1:
-                        print("\t\t\t\t\t\t.....NEXT PAGE...")
-                    else:
-                        print("\t\t\t\t\t\t.....PREVIOUS PAGE...")
-
-                    index += 1
+                    print("\t\t\t\t\t\t.....{:s} PAGE...".format(DisplayString))
+                    index += value
                     goon = True
-                    #os.system('sleep 0.2')
-                elif src == -99:
-                    goon = False
-                    print("\t\t\t\t ......... EXITING2 .........\n\n")
-                    exit(-1)
+
+                print(ISNULL,ISNUMBER)
+
             except (ValueError) as e:
                 goon = False
                 print("\t\t\t\t ......... EXITING .........\n\n")
@@ -556,6 +549,7 @@ class menu_report(report):
                 index = index % len(pagestarts)
                 goon = True
 
+    
     
 class hw_report(report):
     def __init__(self):
