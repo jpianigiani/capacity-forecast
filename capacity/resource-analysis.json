@@ -35,7 +35,7 @@
         "MemoryMBUsedperHV": 7, 
         "TotalUsageIndex": 5,
         "AZ": 3, 
-        "HostAggr": 6,
+        "HostAggr": 4,
         "Project": 14, 
         "VMname": 26, 
         "Flavor": 30, 
@@ -44,8 +44,8 @@
         "CephPerVMGB": 6,
         "SpareRAM": 8,
         "TargetHostAggr": 4,
-        "NewVMs": 100, 
-        "ExistingVMs":120,
+        "NewVMs": 55, 
+        "ExistingVMs":55,
         "VCPUsAvailPerRack": 4, 
         "RAMperRack": 8, 
         "VCPUsUsedPerRack":4, 
@@ -60,12 +60,12 @@
         "SourceSuffix": 22,
         "DestinationSuffix": 22, 
         "Service": 50, 
-        "Outcome": 100, 
+        "Outcome": 40, 
         "vCPU_Load_after": 6 ,
-        "Item": 3, 
+        "Item": 4, 
         "Date": 10, 
         "Suffix": 20, 
-        "Projects": 80, 
+        "Projects": 120, 
         "Warning": 10, 
         "default":10
     },
@@ -83,7 +83,7 @@
 "FieldLists" :
         [ "HostAggr", "NewVMs", "ExistingVMs", "Projects"],
 "FieldListsItemsLength":
-        [1,10,10,20]
+        [1,10,10,30]
 ,
 
 "Reports_Keys" : 

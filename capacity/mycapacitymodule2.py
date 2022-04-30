@@ -323,7 +323,7 @@ class menu_report(report):
                 self.UILIST.append(TMPREC)
                 index += 1
 
-        return self.print_menu(self.Report,prompt)
+        return self.print_menu(params,prompt)
 
 
 
@@ -411,7 +411,7 @@ class menu_report(report):
         if len(output.paramsdict["SERVICE"])==0:
             parname = "SOURCE_SITE_SUFFIX"
             src_da.load_jsons_into_dictarrays(output,parname)
-            output.paramsdict["SERVICE"]=src_da.get_src_prj(output,self )
+            output.paramsdict["SERVICE"]=src_da.GetListOfProjectsInSite(output,self )
 
         output.myprint("------------------ LIST OF PARAMETER ARGUMENTS ---------------------------")	
         output.myprint(json.dumps(output.paramsdict,indent=30))
@@ -461,40 +461,49 @@ class menu_report(report):
 
 
     # PRINTS THE USER INTERACTIVE MENU PREPARED IN get_fileslist()
-    def print_menu(self, sortedlist, prompt):
+    def print_menu(self, params, prompt):
         # PRINT LIST OF ITEMS BY PAGE
-        stringalinea1 = '{0:-^'+str(self.ScreenWitdh)+'}'
-        stringalinea2 = '{0:.^'+str(self.ScreenWitdh)+'}'
+        #self.print_report(params)
+        #exit(-1)
+
+
+        FormatString_AllSpaces = '{0: ^'+str(self.ScreenWitdh)+'}'
+        FormatString_AllDots = '{0:.^'+str(self.ScreenWitdh)+'}'
         rowindex = 0
         goon = True
         pagestarts = []
+        pageends=[]
         pageitems = []
+        DateIndex = self.get_keys().index("Date")
+        PreviousDate=self.Report[0][DateIndex]
+        pagestarts.append(0)
 
-        for pagenum in range(0, 1+int(len(self.UILIST)/self.SitesPerPageToShow), 1):
-            pagestarts.append(pagenum*self.SitesPerPageToShow)
-            pageitems.append(min((+1)*self.SitesPerPageToShow,
-                             len(self.UILIST)-pagenum*self.SitesPerPageToShow))
+        for RecordNum in range(len(self.Report )):
+            CurrentDate=self.Report[RecordNum][DateIndex]
+            if CurrentDate!=PreviousDate:
+                pageends.append(RecordNum-1)
+                pagestarts.append(RecordNum)
+                PreviousDate=CurrentDate
+        pageends.append(len(self.Report))
 
         currentpage = 0
         index = 0
         while goon:
+            index= index  % len(pagestarts)
             os.system("clear")
-            print(menu.FAIL + stringalinea1.format(''))
-            print(menu.FAIL + stringalinea1.format(' CAPACITY FORECAST '))
-            print(menu.FAIL + stringalinea1.format(''))
+            print(menu.FAIL + FormatString_AllSpaces.format(''))
+            print(menu.FAIL + FormatString_AllSpaces.format(' CAPACITY FORECAST '))
+            print(menu.FAIL + FormatString_AllSpaces.format(''))
+            print(menu.Yellow)
+            print(FormatString_AllSpaces.format(' Page '+str(index)+' '))
 
-            # print("\n")
-            data = self.UILIST[0][0][20:31]
+            self.print_keys_on_top_of_report(params)
+            for rowindex in range(pagestarts[index], pageends[index]):
+                print(FormatString_AllDots.format(''))
+                self.print_report_line(params,self.Report[rowindex])
 
-            print(stringalinea1.format(' Page '+str(index)+' '))
-            for rowindex in range(pagestarts[index], pagestarts[index]+pageitems[index]):
-                newdata = self.UILIST[rowindex][0][20:31]
-                if newdata != data:
-                    data = newdata
-                    print(stringalinea2.format(''))
-                print(menu.Yellow+"{:s}".format(self.UILIST[rowindex][0]))
+            print(FormatString_AllSpaces.format(''))
 
-            print(stringalinea1.format(''))
             PAGEBACK = ['-', '_', 'b', 'B']
             try:
                 print(
@@ -516,10 +525,10 @@ class menu_report(report):
                 if ISNULL:
                     src = -99
 
-                if src >= 0 and src < pagestarts[index]+pageitems[index]:
+                if src >= 0 and src < pageends[index]:
                     print(
                         "\t\t\t\t ......... INPUT ACCEPTED {:d}.........\n\n".format(src))
-                    retval = sortedlist[src][3]
+                    retval = self.Report[src][3]
                     print(
                         "\t\t\t\t\t ---------- USER INPUT=>{:s}<--".format(retval))
                     goon = False
@@ -530,10 +539,9 @@ class menu_report(report):
                     else:
                         print("\t\t\t\t\t\t.....PREVIOUS PAGE...")
 
-                    index += value
-                    index = index % len(pagestarts)
+                    index += 1
                     goon = True
-                    os.system('sleep 0.2')
+                    #os.system('sleep 0.2')
                 elif src == -99:
                     goon = False
                     print("\t\t\t\t ......... EXITING2 .........\n\n")

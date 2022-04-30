@@ -1,0 +1,14 @@
+
+    {
+        "__init__":
+            {
+            "Error Code": "", 
+            "Synopsis":"",
+            "Description": "",
+            "DebugMessages": [],
+            "OperationAfterError": ["exit(-1"]
+            }
+    }
+    
+
+           

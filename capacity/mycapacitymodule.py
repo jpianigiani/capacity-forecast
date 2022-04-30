@@ -11,19 +11,16 @@ from datetime import datetime
 
 DEBUG = 0
 
-class error_handler:
-    pass
 
-class transforms:
-    pass
 
 class parameters:
     # -------------------------------------------------------------------------------------------------------------------------
     # GLOBAL DICTIONARIES: these are used to store command line arguments values or user input values (so that the behavior is consistent between User interactive mode and CLI mode)
 
-    PATHFORAPPLICATIONCONFIG='./resource-analysis.json'
+    PATHFORAPPLICATIONCONFIGDATA='./'
+    CONFIGFILE = 'resource-analysis.json'
+    ERRORFILE = 'resource-analysis-errors.json'
     APPLICATIONCONFIG_DICTIONARY={}
-
     MODE_OF_OPT_OPS = 0
     paramsdict={}
     paramslist=[]
@@ -54,7 +51,7 @@ class parameters:
 
         #try:
 
-        with open(self.PATHFORAPPLICATIONCONFIG,'r') as ConfigFile:
+        with open(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE,'r') as ConfigFile:
             TMPJSON = json.load(ConfigFile)
         self.APPLICATIONCONFIG_DICTIONARY=dict(TMPJSON)
         self.PATHFOROPENSTACKFILES=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOpenstackFiles"]
@@ -68,6 +65,9 @@ class parameters:
         #except:
         #    print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application configuration file {:}".format(self.PATHFORAPPLICATIONCONFIG))
         #    exit(-1)
+        with open(self.PATHFORAPPLICATIONCONFIGDATA+self.ERRORFILE,'r') as ConfigFile:
+            TMPJSON = json.load(ConfigFile)
+        self.ERROR_DICTIONARY=dict(TMPJSON)
 
     def set(self, key, value):
         self.paramsdict[key] = value
@@ -81,18 +81,9 @@ class parameters:
     # -----------------------------------
     # PRINT to tty or FILE
     def myprint(self, value):
-        if self.get("OUTPUTTOFILE"):
-            if type(value) == list:
-                temp = ''
-                self.MYGLOBALFILE.write(temp.join(str(value)))
-                self.MYGLOBALFILE.write('\n')
-            else:
-                self.MYGLOBALFILE.write(value)
-                self.MYGLOBALFILE.write('\n')
-        else:
-            if type(value) != str:
+        if type(value) != str:
                 print(str(value))
-            else:
+        else:
                 print(value)
 
     def get_param_value(self, name):
@@ -227,7 +218,7 @@ class dictarray:
         return COUNT
 
     # ------- GET LIST OF PROJECT EXISTING IN SRC SITE ---------------
-    def get_src_prj(self, pars, menu):
+    def GetListOfProjectsInSite(self, pars, menu):
         results = []
 
         for PROGETTO in self.SERVERDICT:
@@ -239,8 +230,8 @@ class dictarray:
         stringalinea1 = '{0:_^'+str(menu.ScreenWitdh)+'}'
         pars.myprint(stringalinea1.format(
             " SERVICES AVAILABLE IN SITE "+pars.paramsdict["SOURCE_SITE_SUFFIX"]))
-        for x in sortedres:
-            print("- {:2d} --- {:20s}".format(index, x))
+        for ServiceName in sortedres:
+            print("- {:2d} --- {:20s}".format(index, ServiceName))
             index += 1
 
         src = str(input("Enter source SERVICES separated by <space>:"))
@@ -413,166 +404,178 @@ class report(parameters):
             print(
                 "--- DEBUG --- for nodo={:s} agglist={:s}".format(mynodo, appartenenza_nodo))
         return appartenenza_nodo
+#---------------------------------------------------
+#   Receives a Report Record, produces as return value a 2D Array containing one record per Line to be printed with wrapping of text beyond FieldLength
+#---------------------------------------------------
+    def LineWrapper(self, record):
+        var_Keys=self.get_keys()
+        Lines=[[]]
+        MaxRows=8
+        Lines=[['' for j in range(len(var_Keys) )] for i in range(MaxRows)]
+        MaxRows=0
 
-    # ---------------------------------
-    # Print a report ARRAY (list of lists), line by line
-    def print_report(self, pars):
-        
-        MyLine = '{0:_^'+str(pars.ScreenWitdh)+'}'
+        for ReportKeyItem in var_Keys:
+            RecordEntryIndex =var_Keys.index(ReportKeyItem)
+            var_FieldLen = self.get_fieldlength(ReportKeyItem)
+            var_RecordEntry= record[RecordEntryIndex]  
+            if type(var_RecordEntry)== list:
+                var_Entry=""
+                for ListItem in var_RecordEntry:
+                    var_Entry+=ListItem
+            else:
+                var_Entry=var_RecordEntry
+            var_RecordEntryLen = len(var_Entry)
+            RowsValue = math.ceil(var_RecordEntryLen/var_FieldLen)
+            if RowsValue>MaxRows:
+                MaxRows=RowsValue
+
+            for NofLinesPerRecEntry in range(RowsValue):
+                stringa_start = NofLinesPerRecEntry*var_FieldLen
+                if (var_RecordEntryLen> stringa_start+ var_FieldLen  ):
+                    stringa_end = (1+NofLinesPerRecEntry)*var_FieldLen
+                else:
+                    stringa_end =  var_RecordEntryLen
+                newItem=var_Entry[stringa_start:stringa_end]
+                Lines[NofLinesPerRecEntry][RecordEntryIndex]=newItem
+
+        retval=[]
+        for i in range(MaxRows):
+            myline=''
+            for j in range(len(var_Keys)):
+                length=self.get_fieldlength(var_Keys[j])
+                stringa1="{:"+str( length  )+"s} |"
+                myline+=stringa1.format(Lines[i][j])    
+            retval.append(myline)
+
+        return retval
+
+
+#---------------------------------------------------
+#   Receives a Report Record, produces a 1D record[] after applying Transforms to each entry in accordance to .json file of application configuration
+#---------------------------------------------------
+    def Record_ApplyTransforms(self,record):
+        reportkeys=self.get_keys()
+        NewRecord=[]
+        currentrecord={}
+
+        for row_itemnumber in range(self.keys_length()):
+            # Fetches each item in the report row into initialvalue and gets what type it is, and what's the length of the output record (FIELDLENGTH)
+            initialvalue = record[row_itemnumber]
+            mytype = type(initialvalue)
+            key=reportkeys[row_itemnumber]
+            currentrecord[key]=record[row_itemnumber]
+            columnname = reportkeys[row_itemnumber]
+            length = self.FIELDLENGTHS[columnname]
+            FormatString_SingleValue="{:"+str( length)+"s}"
+            try:
+                transform = self.FIELDTRANSFORMS[columnname]
+            except:
+                transform = 'value'
+            try:
+                if mytype == list:
+                    ListItemLen =self.FIELDLISTSITEMSLENGTH[self.FIELDLISTS.index(columnname)]
+                    FormatString_ListItemField ="{:"+str( ListItemLen)+"s}"
+                    NewRecordListEntry=[]
+                    for RecordEntry in initialvalue:
+                        try:
+                            value = FormatString_ListItemField.format(str(RecordEntry))
+                            TransformedValue = eval(transform)
+                            #print("Record_ApplyTransforms DEBUG >{:}< >{:}<".format(TransformedValue,columnname))
+                            #NewRecordListEntry.append(FormatString_SingleValue.format(TransformedValue))
+                            NewRecordListEntry.append(TransformedValue)
+
+                        except:
+                            print("Record_ApplyTransforms: ERROR 05 in applying transform\n")
+                            print("Record_ApplyTransforms: item RecordEntry={:},transform={:}".format(RecordEntry,transform) )
+                            exit(-1)
+                    NewRecord.append(NewRecordListEntry)
+                    
+                else:
+                    value = str(initialvalue)
+                    NewRecord.append(FormatString_SingleValue.format(eval(transform)))
+
+            except:
+                print("Record_ApplyTransforms: ERROR 04 START - neither list nor else\n")
+                print("transform=",transform)
+                print("record:\n")
+                print(record)
+                eval(transform)
+                print("Record_ApplyTransforms: ERROR 04 - END")
+                exit(-1)
+
+        return NewRecord
+
+#---------------------------------------------------
+#   REturns Report color by report class
+#---------------------------------------------------      
+    def set_report_color(self):
         a = str(self.__class__)
         b= a.replace("'",'').replace("<",'').replace(">","").replace("class ","")
         if b.find("vm_report")>-1:
             color=menu.OKGREEN
         else:
             color=menu.Yellow
+        return color
+  # ---------------------------------
+    # Print  report Keys header - using Text Wrapping
+    # ---------------------------------   
+    def print_keys_on_top_of_report(self,pars):
+        color=self.set_report_color()
+        var_Keys=self.get_keys()
+        NewLines=self.LineWrapper(var_Keys)
+        for myline in NewLines:
+            pars.myprint("{:}".format(myline))
+            pars.myprint
+            self.write_line_to_file(color+myline)
 
+    def print_report_line(self, pars,record):
+        NewRecord=[]
+        NewLines=[[]]
+        NewRecord=self.Record_ApplyTransforms(record)
+        NewLines=self.LineWrapper(NewRecord)
+
+        for myline in NewLines:
+                pars.myprint("{:}".format(myline))
+                pars.myprint
+                self.write_line_to_file("{:s}".format(myline))
+        return True
+
+    # ---------------------------------
+    # Print a report ARRAY (list of lists), line by line  - Includes Text Wrapping
+    # ---------------------------------
+    def print_report(self, pars):
+        # REPORT HEADER
+        MyLine = '{0:_^'+str(pars.ScreenWitdh)+'}'
+        color=self.set_report_color()
         pars.myprint(MyLine.format(self.name))
         self.write_line_to_file(MyLine.format(self.name)+"\n")
         pars.myprint(MyLine.format(self.State))
         self.write_line_to_file(MyLine.format(self.State)+"\n")
 
-        def print_keys_on_top_of_report(self):
-            var_Keys=self.get_keys()
-            HeaderLines=[]
-            MaxRows=0
-            ColLengths=[]
+        #PRINT KEYS HEADER
+        self.print_keys_on_top_of_report(pars)
 
-            for ReportKeyItem in var_Keys:
-
-                var_FieldLen = self.get_fieldlength(ReportKeyItem)
-                var_KeyLen = len(ReportKeyItem)                
-                #print("field = {:s} KeyLen={:d} FieldLen={:d}".format(ReportKeyItem, var_KeyLen,var_FieldLen))
-                NewKeyLine=[]
-                ColLengths.append(math.ceil(var_KeyLen/var_FieldLen))
-
-
-                if math.ceil(var_KeyLen/var_FieldLen)>MaxRows:
-                    MaxRows=math.ceil(var_KeyLen/var_FieldLen)
-                for NofLinesPerKey in range(0,math.ceil(var_KeyLen/var_FieldLen)):
-                    stringa_start = NofLinesPerKey*var_FieldLen
-                    if (var_KeyLen> stringa_start+ var_FieldLen  ):
-                        stringa_end = (1+NofLinesPerKey)*var_FieldLen
-                    else:
-                        stringa_end =  var_KeyLen
-                    newItem=ReportKeyItem[stringa_start:stringa_end]
-                    #"{:"+str(var_FieldLen)+"s}".format()
-                    NewKeyLine.append(newItem)
-                    #print(newItem)
-                
-                HeaderLines.append(NewKeyLine)
-            NewHeaders=[['' for i in range(MaxRows)] for j in range(len(var_Keys) )]
-            for i in range(len(HeaderLines)):
-                for j in range(len(HeaderLines[i])):
-                    NewHeaders[i][j]=HeaderLines[i][j]
-
-            for i in range(MaxRows):
-                myline=''
-                for j in range(len(var_Keys)):
-                    length=self.get_fieldlength(var_Keys[j])
-                    stringa1="{:"+str( length  )+"s} |"
-                    myline+=stringa1.format(NewHeaders[j][i])      
-                pars.myprint(stringa1.format(color+myline))
-                self.write_line_to_file(stringa1.format(color+myline))
-            
-        # --------------------------------------------------------------------------------------------------------
-        # PRINT_REPORT - def procedure
-        # --------------------------------------------------------------------------------------------------------
-        if self.length() == 0:
-            print("ERROR - print_report  - report array {} has 0 records".format(self))
-            print("-- print_report : ")
-            print(json.dumps(pars.paramsdict ,indent=22))
-            print("-- print_report")
-            exit(-1)
-        if pars.is_silentmode() == False:
-            pars.myprint(color)
-        
-        print_keys_on_top_of_report(self)
-        
+        # PRINT THE REPORT LINE BY LINE
+        NewRecord=[]
         reportkeys=self.get_keys()
-
         for record in self.Report:
-            myline = ''
-            myformat = ''
-            mylines=[]
-            currentrecord={}
-            for row_itemnumber in range(self.keys_length()):
-                # Fetches each item in the report row into initialvalue and gets what type it is, and what's the length of the output record (FIELDLENGTH)
+            self.print_report_line(pars,record)
 
-                if row_itemnumber < len(record):
-                    initialvalue = record[row_itemnumber]
-                    mytype = type(initialvalue)
-                    key=reportkeys[row_itemnumber]
-                    currentrecord[key]=record[row_itemnumber]
-                    newelement = row_itemnumber
-                else:
-                    initialvalue = '!!'
-                    mytype = string
-                    newelement = row_itemnumber
-
-                columnname = self.get_keys()[newelement]
-                length = self.FIELDLENGTHS[columnname]
-                
-                FormatString_ValueField="{:"+str( length)+"s} |"
-                stringa2="{:"+str( length)+"s}"
-                try:
-                    transform = self.FIELDTRANSFORMS[columnname]
-                except:
-                    transform = 'value'
-                try:
-                    if mytype == list:
-                        tmpline = ''
-                        tmpval=''
-                        ListItemLen =self.FIELDLISTSITEMSLENGTH[self.FIELDLISTS.index(columnname)]
-                        FormatString_ListItemField ="{:"+str( ListItemLen)+"s}"
-                        for x in initialvalue:
-                            try:
-                                value = FormatString_ListItemField.format(str(x))
-                                tmpval += eval(transform)
-                            except:
-                                print("print_report: ERROR in applying transform\n")
-                                print("print_report: item x={:},transform={:}".format(x,transform) )
-                        tmpline += stringa2.format(tmpval)
-                        myline += FormatString_ValueField.format(tmpline)
-                    else:
-                        value = str(initialvalue)
-                        myline += FormatString_ValueField.format(eval(transform)[0:length])
-                            #myline += eval(transform) + " | "
-                except:
-                    myline += stringa2.format("?? |")
-                    print("print_report: ERROR 03 START - neither list nor else\n")
-                    print("transform=",transform)
-                    print("record:\n")
-                    print(record)
-                    eval(transform)
-                    print("print_report: ERROR 03 - END")
-
-            
-            pars.myprint("{:s}".format(myline))
-            self.write_line_to_file("{:s}".format(myline))
-
-        if len(self.ReportTotalUsage)>0:
-            myline=self.ReportTotalUsage
-            pars.myprint(myline)
-            self.write_line_to_file("{:}".format(myline))
-            
         return -1
 
+    # ---------------------------------
     # SORT SOURCE REPORT IN ACCORDANCE TO SORTING KEYS
+    # ---------------------------------
     def sort_report(self, sortkeys):
         #try:
             reportkeys = self.get_keys()
             mykeys = []
             myfunc = ''
             for m in sortkeys:
-                #print("DEBUG SORT REPORT self= :m=",self, m)
-                # GET THE INDEX OF EACH ITEM IN SORTINGKEYs
                 val = reportkeys.index(m)
-
                 mykeys.append('x['+str(val)+']')
             myfunc = ",".join(mykeys)
-            # print(myfunc)
-            # print(reportkeys)
-            # print(len(reportkeys))
+
 
             self.Report.sort(key=lambda x: eval(myfunc))
         #except:
