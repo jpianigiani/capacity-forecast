@@ -1,3 +1,4 @@
+from curses import ERR
 import json
 import string
 import sys
@@ -5,15 +6,21 @@ import glob
 import os
 import itertools
 import math
+import re
 import operator
 from datetime import datetime
+import traceback
 
 
 DEBUG = 0
 
-
-
+# -------------------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------------------
+#                           CLASS :     PARAMETERS
+# -------------------------------------------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 class parameters:
+    # 
     # -------------------------------------------------------------------------------------------------------------------------
     # GLOBAL DICTIONARIES: these are used to store command line arguments values or user input values (so that the behavior is consistent between User interactive mode and CLI mode)
 
@@ -24,7 +31,9 @@ class parameters:
     MODE_OF_OPT_OPS = 0
     paramsdict={}
     paramslist=[]
-
+    ERROR_REPORT=[]    
+    ERROR_DATA=[]
+    
     # -------------------------------------------------------------------------------------------------------------------------
     # FORMULAS FOR DISTANCE CALCULATION FROM TARGET
     # -------------------------------------------------------------------------------------------------------------------------
@@ -36,8 +45,6 @@ class parameters:
     OPTIMIZE_BY_CALC = 1
     OPTIMIZE_BY_FILE = 2
 
-
-
     def __init__(self):
         now = datetime.now()  # current date and time
         date_time = now.strftime("%d/%m/%Y %H:%M:%S")
@@ -48,26 +55,39 @@ class parameters:
         screenrows, screencolumns = os.popen('stty size', 'r').read().split()
         self.ScreenWitdh = int(screencolumns)
         self.ColorsList =(menu.OKBLUE,menu.OKCYAN,menu.OKGREEN,menu.WARNING,menu.FAIL,menu.White,menu.Yellow,menu.Magenta,menu.Grey) 
+        self.ERROR_REPORT=[]
 
-        #try:
+        try:
 
-        with open(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE,'r') as ConfigFile:
-            TMPJSON = json.load(ConfigFile)
-        self.APPLICATIONCONFIG_DICTIONARY=dict(TMPJSON)
-        self.PATHFOROPENSTACKFILES=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOpenstackFiles"]
-        self.PATHFOROUTPUTREPORTS=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOutputReports"]
-        self.FILETYPES=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["FileTypes"])
-        self.paramsdict = self.APPLICATIONCONFIG_DICTIONARY["Application_Parameters"]
-        self.paramslist=list(self.APPLICATIONCONFIG_DICTIONARY["Application_Visible_Parameters"])
-        self.OUTPUTFILENAME=self.PATHFOROUTPUTREPORTS+'/capacity-forecast.results'
-        self.MYGLOBALFILE = open(self.OUTPUTFILENAME, 'w')
-        self.metricformulas=self.APPLICATIONCONFIG_DICTIONARY["RackOptimizationInputParameters"]["MetricFormulasForRackOptimization"]
-        #except:
-        #    print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application configuration file {:}".format(self.PATHFORAPPLICATIONCONFIG))
-        #    exit(-1)
-        with open(self.PATHFORAPPLICATIONCONFIGDATA+self.ERRORFILE,'r') as ConfigFile:
-            TMPJSON = json.load(ConfigFile)
-        self.ERROR_DICTIONARY=dict(TMPJSON)
+            with open(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE,'r') as ConfigFile:
+                try:
+                    TMPJSON = json.load(ConfigFile)
+                except:
+                    traceback.print_exc(limit=None, file=None, chain=True)
+                    print(" CRITICAL! : object class PARAMETERS, __init__ found JSON syntax error in  {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
+                    exit(-1)
+            self.APPLICATIONCONFIG_DICTIONARY=dict(TMPJSON)
+            self.PATHFOROPENSTACKFILES=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOpenstackFiles"]
+            self.PATHFOROUTPUTREPORTS=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOutputReports"]
+            self.FILETYPES=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["FileTypes"])
+            self.EXTENDEDFILETYPES=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["ExtendedFileTypes"])
+
+            self.paramsdict = self.APPLICATIONCONFIG_DICTIONARY["Application_Parameters"]
+            self.paramslist=list(self.APPLICATIONCONFIG_DICTIONARY["User_CLI_Visible_Parameters"])
+            self.OUTPUTFILENAME=self.PATHFOROUTPUTREPORTS+'/capacity-forecast.results'
+            self.MYGLOBALFILE = open(self.OUTPUTFILENAME, 'w')
+            self.metricformulas=self.APPLICATIONCONFIG_DICTIONARY["RackOptimizationInputParameters"]["MetricFormulasForRackOptimization"]
+        except:
+            traceback.print_exc(limit=None, file=None, chain=True)
+            print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application configuration file {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
+            exit(-1)
+        try:
+            with open(self.PATHFORAPPLICATIONCONFIGDATA+self.ERRORFILE,'r') as ConfigFile:
+                self.ERROR_DICTIONARY = json.load(ConfigFile)
+        except:
+            traceback.print_exc(limit=None, file=None, chain=True)
+            print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application error data file {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.ERRORFILE))
+            exit(-1)
 
     def set(self, key, value):
         self.paramsdict[key] = value
@@ -81,6 +101,8 @@ class parameters:
     # -----------------------------------
     # PRINT to tty or FILE
     def myprint(self, value):
+        if value is None:
+            return
         if type(value) != str:
                 print(str(value))
         else:
@@ -125,49 +147,205 @@ class parameters:
         CMD4 = CMD3.replace(", ", ",")
         self.myprint(CMD4)
         return True
+        
+    def SuffixToShortDate(self,suffix):
+        retval =suffix[6:8]+"-"+suffix[4:6]+"-"+suffix[0:4]
+        return retval
 
-        # this function is used to fetch - for a suffix - the list of files to use 
-    def GetListOfFilesFromSuffixMatch(self,suffissotouse):
-            # ----------------------------------------------
-            # TRUE if site  == mgmt site
-        def IsItAMgmtSite(suffix):
-                if len(suffix)==14 or suffix[14:]=='ber800' or suffix[14:]=='stg810':
-                    return True
+    def SuffixToYYMMDDDateValue(self,suffix):
+        retval =int(suffix[0:4]+suffix[4:6]+suffix[6:8])
+        return retval
+# --------------------EXTRACTS SITENAME FROM SUFFISSO note : STG810 specific parsing
+    def parse_suffisso(self, suffisso):
+        if len(suffisso) == 20:
+            # NOTE: STG810 does not show stg810 in the suffix as the cc-jumphost hostname is configured wrongly
+            sitename= suffisso[14:]
+            retval=sitename.lower()
+        else:
+            sitename= "stg810"
+            retval=sitename.lower()
+        return retval
+
+    def IsItAMgmtSite(self,suffix):
+            Sitename=self.parse_suffisso(suffix)
+            if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveMgmtSites"]:
+                Retval=True
+            if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabMgmtSites"]:
+                Retval= True
+            else:
+                Retval =False
+            return Retval
+
+    def SiteType(self, sitename):
+        Categs= self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["Categories"]
+        for Item in Categs:
+            if sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][Item]:
+                return Item
+            
+        return "??"
+
+    # ----------------------------------------------
+    def IsItWhatSite(self,category,suffix):
+            Sitename=self.parse_suffisso(suffix)
+            if category not in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["Categories"]:
+                ErrString= "Category passed to IsItWhatSite is not in application config data list :"+category
+                self.cast_error("00011",ErrString)
+            if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][category]:
+                Retval=True
+            if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][category]:
+                Retval= True
+            else:
+                Retval =False
+            return Retval
+
+
+    # ----------------------------------------------
+    def Parse_Filtered_OS_FileList_BySuffixOrCommandMatch(self,CleanListOfJSONFiles, SuffixParameter):
+            
+            InternalReport=[]
+            Retval=[]
+
+            ParamsList=SuffixParameter.split(",")
+            SiteCmdList= self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["SiteCommands"]
+            SiteCmdMap=self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["SiteCommandMap"]
+            TimeCmdList= self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["TimeCommands"]
+
+            MySiteList=[]
+            SiteCommandsList=[]
+            TimeCommandsList=[]
+
+            SiteCommandsList  = list(filter(len, SiteCommandsList))
+
+#           exit(-1)
+# 
+            SuffixList=[]
+            for Item in ParamsList:
+                if Item in SiteCmdList:
+                    SiteCommandsList.append(Item)
+                    for SubItem in SiteCmdMap[Item]:
+                        MyAddlSitesList=self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][SubItem]
+                        MySiteList+=MyAddlSitesList
+                elif Item in TimeCmdList:
+                    TimeCommandsList.append(Item)
                 else:
-                    return False
-            # ----------------------------------------------
+                    SuffixList.append(Item)   
+            MySiteList= list(dict.fromkeys(MySiteList))
+
+
+            # Exact or partial Match of one or more Suffixes separated by Comma - Return files
+            RetVal2=[]
+            CurrentDate=19000101
+ 
+            for x in CleanListOfJSONFiles: 
+                Sitename=self.parse_suffisso(x)
+                ShortDate=self.SuffixToShortDate(x)
+                YYYYMMDDDate= self.SuffixToYYMMDDDateValue(x)
+                IsLiveManagement= self.IsItWhatSite("LiveMgmtSites",x)
+                IsLabManagement= self.IsItWhatSite("LabMgmtSites",x)
+                IsManagement=IsLiveManagement or IsLabManagement
+
+                AppendRecord0=True
+                AppendRecord1=True
+                AppendRecord2=True
+
+                for Suffix in SuffixList:
+                    AppendRecord0= x.find(Suffix)>-1 and AppendRecord0
+
+                #print(x, x in MySiteList, MySiteList)
+                if Sitename in MySiteList or len(MySiteList)==0:
+                    AppendRecord1=True
+                else:
+                    AppendRecord1=False
+
+                if self.paramsdict["SKIPMGMTSITE"] and IsManagement:
+                    AppendRecord2=False
+                else:
+                    AppendRecord2=True
+
+                if AppendRecord0 and AppendRecord1 and AppendRecord2:
+                    RetVal2.append(x)
+
+
+            if len(RetVal2)==0:
+                print("No file returned")
+                ErrString= "Parse_Filtered_OS_FileList_BySuffixOrCommandMatch: "+SuffixParameter+" file selector returns Empty Openstack filelist"
+                self.cast_error("00012",ErrString)
+
+            SortedByDateList = sorted(RetVal2, key=lambda x:x[0], reverse=True)
+
+
+            return SortedByDateList        
+
+
+            #    and (i.find(suffissotouse)>-1 
+            #    and (self.paramsdict["SKIPMGMTSITE"]==False or IsItAMgmtSite(i)==False))] 
+            # TRUE if site  == mgmt site
+
+    def Get_Clean_Openstack_FilesList(self):
 
         cleanlist=[]
-        ListOfFiles=os.listdir(self.PATHFOROPENSTACKFILES)
-
-        files_txt = [i for i in ListOfFiles if i.endswith('.json') and (i.find(suffissotouse)>-1 and (self.paramsdict["SKIPMGMTSITE"]==False or IsItAMgmtSite(i)==False))]
+        try:
+            ListOfFiles=os.listdir(self.PATHFOROPENSTACKFILES)
+        except:
+                self.cast_error("00003",self.PATHFOROPENSTACKFILES)
+        files_txt=[i for i in ListOfFiles if i.endswith('.json')]
         for Filename in files_txt:
             for FileType in self.FILETYPES:
                 PositionInFilename=Filename.find(FileType)
                 if PositionInFilename>-1:
                     value = Filename[PositionInFilename+len(FileType)+1:Filename.find('.json')]
-                    condition3= self.paramsdict["SKIPMGMTSITE"]==False or IsItAMgmtSite(value)==False
-                    if condition3:
-                        cleanlist.append(value)
+                    cleanlist.append(value)
         cleandict=dict.fromkeys(cleanlist)
         cleanlist=[]
         cleanlist=list(cleandict)
+        return cleanlist
+
+        # this function is used to fetch - for a suffix - the list of files to use 
+    def GetListOfFilesFromSuffixMatch(self,suffissotouse):
+            # ----------------------------------------------
+        cleanlist=[]
+        cleanlist= self.Get_Clean_Openstack_FilesList()
         if len(cleanlist)==0:
-            print("ERROR : no Openstack JSONs files found in folder... exiting")
-            exit(-1)
-        return(cleanlist)
+            self.cast_error("00003","Array CleanList is empty: 0 records")
+        retval=self.Parse_Filtered_OS_FileList_BySuffixOrCommandMatch( cleanlist, suffissotouse)
+        return(retval)
+    
+    def cast_error(self,ErrorCode, AddlData):
+        NEWRECORD=[]
+        a = str(self.__class__)
+        traceback.print_exc(limit=None, file=None, chain=True)
+        ErrorObjectClass= a.replace("'",'').replace("<",'').replace(">","").replace("class ","")
+        ErrorInfo=self.ERROR_DICTIONARY[ErrorCode]
+        #print(json.dumps(ErrorInfo,indent=30))
+        ErrorObjectClass=ErrorInfo["Class"]
+        SrcSuffix=self.get_param_value("SOURCE_SITE_SUFFIX")
+        SiteName= self.parse_suffisso(SrcSuffix)
+        if ErrorInfo["Level"]=="CRITICAL":
+            NEWRECORD.append(SrcSuffix[0:8])
+            NEWRECORD.append(SiteName)
+            NEWRECORD.append(ErrorInfo["Level"])
+            NEWRECORD.append(ErrorObjectClass)
+            NEWRECORD.append(ErrorCode)
+            NEWRECORD.append(ErrorInfo["Synopsis"])
+            NEWRECORD.append(AddlData)
+            #NEWRECORD.append(ErrorInfo)
+            self.ERROR_REPORT.append(NEWRECORD)
+
+        actions = ErrorInfo["AfterErrorExecution"]
+        for Item in actions:
+            print("cast_error")
+            print(ErrorCode)
+            print(NEWRECORD)
+            print(AddlData)
+            print(Item)
+            eval(Item)
 
 
-
-
-# --------------------EXTRACTS SITENAME FROM SUFFISSO note : STG810 specific parsing
-    def parse_suffisso(self, suffisso):
-        if len(suffisso) == 20:
-            # NOTE: STG810 does not show stg810 in the suffix as the cc-jumphost hostname is configured wrongly
-            return suffisso[14:]
-        else:
-            return "stg810"
-
+# -------------------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------------------
+#                           CLASS :     DICTARRAY
+# -------------------------------------------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 class dictarray:
     DICT_ARRAY = []
     AGGREGATE_LIST = []
@@ -175,6 +353,9 @@ class dictarray:
     SERVERDICT = {}
     FLAVOR_LIST = []
     VOLUME_LIST = []
+    NETWORK_LIST = []
+    SUBNET_LIST = []
+    VIRTUALPORT_DICT= {}
 
     def __init__(self):
         self.DICT_ARRAY = []
@@ -183,7 +364,11 @@ class dictarray:
         self.SERVERDICT = {}
         self.FLAVOR_LIST = []
         self.VOLUME_LIST = []
-
+        self.NETWORK_LIST = []
+        self.SUBNET_LIST = []
+        self.VIRTUALPORT_DICT= {}
+        self.VMPERPROJECT={}
+        self.SKIPSERVICEGRAPH=False
 
     # --------------------------------------------------------------
     # This function loads the json files into the relevant ARRAY of list or dict
@@ -206,8 +391,8 @@ class dictarray:
                 COUNT += 1
 
             except (IOError, EOFError) as e:
-                print("ERROR - file {:s} does not exist".format(FILENAME))
-                exit(-1)
+                pars.cast_error("00004","file:"+FILENAME)
+
 
         self.AGGREGATE_LIST = self.DICT_ARRAY[0]
         self.HYPERVISOR_LIST = self.DICT_ARRAY[1]
@@ -215,37 +400,36 @@ class dictarray:
         self.FLAVOR_LIST = self.DICT_ARRAY[3]
         self.VOLUME_LIST = self.DICT_ARRAY[4]
 
-        return COUNT
+        if pars.paramsdict["SERVICEGRAPHENABLED"]:
 
-    # ------- GET LIST OF PROJECT EXISTING IN SRC SITE ---------------
-    def GetListOfProjectsInSite(self, pars, menu):
-        results = []
+            self.DICT_ARRAY = []
+            for ITEM in pars.EXTENDEDFILETYPES:
+                value = pars.paramsdict[paramname]
+                FILENAME = pars.PATHFOROPENSTACKFILES + "/" + "openstack_" + ITEM + "_" + value + ".json"
 
-        for PROGETTO in self.SERVERDICT:
-            str_PROGETTO = str(PROGETTO)
-            results.append(str_PROGETTO)
-        index = 0
-        sortedres = sorted(results, key=lambda x: x[0], reverse=False)
-        os.system("clear")
-        stringalinea1 = '{0:_^'+str(menu.ScreenWitdh)+'}'
-        pars.myprint(stringalinea1.format(
-            " SERVICES AVAILABLE IN SITE "+pars.paramsdict["SOURCE_SITE_SUFFIX"]))
-        for ServiceName in sortedres:
-            print("- {:2d} --- {:20s}".format(index, ServiceName))
-            index += 1
-        src=""
-        
-        while len(src)==0: 
-            src = str(input("Enter source SERVICES separated by <space>:"))
-        res = []
-        if src.upper().find("ALL")>-1:
-            res = [i for i in sortedres]
-        else:
-            lista = [int(i) for i in src.split(' ') if i.isdigit()]
-            for x in lista:
-                res.append(sortedres[x])
-        print(res)
-        return res
+                try:
+                    with open(FILENAME, 'r') as file1:
+                        TMPJSON = json.load(file1)
+                        self.DICT_ARRAY.append(TMPJSON)
+                        # if  DEBUG>1:
+                        #print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
+                    COUNT += 1
+                except (IOError, EOFError) as e:
+                    self.SKIPSERVICEGRAPH=True
+                    MyName=self.__class__
+                    ErrString="{:} skipping ServiceGraphReport ".format(MyName)
+                    print(ErrString)                   
+                    pars.cast_error("00013","file:"+FILENAME)
+
+            if self.SKIPSERVICEGRAPH==False:
+                self.NETWORK_LIST = self.DICT_ARRAY[0]
+                self.SUBNET_LIST = self.DICT_ARRAY[1]
+                self.VIRTUALPORT_DICT = dict(self.DICT_ARRAY[2])
+                return COUNT
+            else:
+                return 0
+
+
 
 
     def get_vms_by_computenode(self,node):
@@ -258,50 +442,77 @@ class dictarray:
         #print("get_vm_by_computenode {:}".format(retval))
         return retval
 
-class report(parameters):
-    # GENERAL - Length of Each KEY in SOURCE REPORT
+    def get_VNs_and_subnets(self,VNUUID):
+        Retval=[]
+        for VN in [x for x in self.NETWORK_LIST if x["ID"]==VNUUID]:
+            VNSubnetUUID=VN["Subnets"]
+            VNStatus= VN["State"]
+            for Subnet in [y for y in self.SUBNET_LIST if y["ID"]==VNSubnetUUID]:
+                SubnetCIDR=Subnet["Subnet"]
+                SubnetIPVersion=Subnet["IP Version"]
+                SubnetAllocPool=Subnet["Allocation Pools"]
+                SubnetName=Subnet["Name"]
+                TMPREC=[]
+                TMPREC.append(VNStatus)
+                TMPREC.append(SubnetName)
+                TMPREC.append(str(SubnetIPVersion))
+                TMPREC.append(SubnetCIDR)
+                TMPREC.append(SubnetAllocPool)
+                Retval.append(TMPREC)
+        return Retval
 
-    # GENERAL - Function applied during printing of report on each field to transform output
+                
+    # Associates  VM to HOSTS
+    # ----------------------------------
+    def cmpt_to_agglist(self, mynodo):
+        appartenenza_nodo = []
+        for item in self.AGGREGATE_LIST:
+            if mynodo in item["hosts"]:
+                appartenenza_nodo.append(str(item["name"]))
+        if DEBUG >= 3:
+            print(
+                "--- DEBUG --- for nodo={:s} agglist={:s}".format(mynodo, appartenenza_nodo))
+        return appartenenza_nodo
 
-    ReportType_VM = "VM"
-    ReportType_HW = "HW"
-    ReportType_RACK = "RACK"
-    ReportType_TOTALRESULTS = "TOTALRESULTS"
-    ReportType_MENU = "MENU"
-    ReportType_REPORTTOTALUSAGE = "MENU"
-    ReportTypesList = (ReportType_VM, ReportType_HW, ReportType_RACK,
-                       ReportType_TOTALRESULTS, ReportType_MENU,ReportType_REPORTTOTALUSAGE)
 
-    ReportKeysVariables = ["VM_REPORT_KEYS",
-                            "HW_REPORT_KEYS","RACK_REPORT_KEYS",
-                            "TOTALRESULTS_REPORT_KEYS","MENU_REPORT_KEYS",
-                            "HWREPORTTOTALUSAGE_KEYS"]
-    ReportSortingKeysVariables =[
-        "VM_REPORT_SORTINGKEYS",
-        "HW_REPORT_SORTINGKEYS",
-        "RACK_REPORT_SORTINGKEYS",
-        "TOTALRESULTS_REPORT_SORTINGKEYS",
-        "MENU_REPORT_SORTINGKEYS",
-        "HWREPORTTOTALUSAGE_SORTINGKEYS"]
+# -------------------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------------------
+#                           CLASS :     REPORT
+# -------------------------------------------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
+class report():
+
     Report = []
     ReportTotalUsage = []
+    GenericDict={}
 
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self,params):
+        #super().__init__()
         self.Report = []
         self.ReportType=0
         self.State=''
+        self.KEYS_KEYNAME="_KEYS"
+        self.SORTINGKEYS_KEYNAME="_SORTING_KEYS"
+        self.color=menu.Yellow
         self.ReportTotalUsage = []
+        self.PARAMS = params
         self.name=str(self.__class__).replace("'",'').replace("<",'').replace(">","").replace("class ","") + hex(id(self))
-        self.FIELDLENGTHS= self.APPLICATIONCONFIG_DICTIONARY["FieldLenghts"]
-        self.FIELDLISTS= self.APPLICATIONCONFIG_DICTIONARY["FieldLists"]
-        #print(json.dumps(self.APPLICATIONCONFIG_DICTIONARY,indent=22))
-        self.FIELDLISTSITEMSLENGTH= self.APPLICATIONCONFIG_DICTIONARY["FieldListsItemsLength"]
 
-        self.FIELDTRANSFORMS=self.APPLICATIONCONFIG_DICTIONARY["FieldTransforms"]
-        self.REPORTFIELDGROUP =self.APPLICATIONCONFIG_DICTIONARY["Reports_Keys"]
-        self.RACKOPTPARAMETERS =self.APPLICATIONCONFIG_DICTIONARY["RackOptimizationInputParameters"]
+        self.ReportsNamesAndData = params.APPLICATIONCONFIG_DICTIONARY["ReportsSettings"]
+        self.FIELDLENGTHS= params.APPLICATIONCONFIG_DICTIONARY["FieldLenghts"]
+        self.FIELDLISTS= params.APPLICATIONCONFIG_DICTIONARY["FieldLists"]
+        #print(json.dumps(self.APPLICATIONCONFIG_DICTIONARY,indent=22))
+        self.FIELDTRANSFORMS=params.APPLICATIONCONFIG_DICTIONARY["FieldTransforms"]
+        self.REPORTFIELDGROUP =params.APPLICATIONCONFIG_DICTIONARY["Reports_Keys"]
+        self.RACKOPTPARAMETERS =params.APPLICATIONCONFIG_DICTIONARY["RackOptimizationInputParameters"]
+        self.FILESSTRUCTURE =params.APPLICATIONCONFIG_DICTIONARY["Files"]
+        self.GenericDict={}
+
+    def get_reporttype(self):
+        MyClass= str(self.__class__).replace("<","").replace(">","").replace("'","")
+        retval=MyClass.split(".")[1].upper()
+        return retval
 
     def ClearData(self):      
         self.Report = []
@@ -310,7 +521,7 @@ class report(parameters):
 
     def set_name(self,myname):
         self.name=myname
-        self.ReportFile = open(self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOutputReports"]+"/"+self.name, 'w')
+        self.ReportFile = open(self.FILESSTRUCTURE["PathForOutputReports"]+"/"+self.name, 'w')
 
 
     def set_state(self,mystatus):
@@ -322,47 +533,46 @@ class report(parameters):
         try:
             self.ReportFile.write(line+"\n")
         except:
-            print("ERROR : {} write_line_to_file - name for object {} is empty".format(self.__class__,self.name))
-            exit(-1)
+            self.PARAMS.cast_error("00005","line:"+line)
+
+
+    def get_keys(self):
+        try:
+            return self.REPORTFIELDGROUP[self.ReportType+self.KEYS_KEYNAME]
+        except:
+            self.PARAMS.cast_error( "00007","get_keys :{:}".format(self.ReportType+self.KEYS_KEYNAME))
 
     def get_sorting_keys(self):
         try:
-            return eval("self."+self.ReportSortingKeysVariables[self.ReportTypesList.index(self.ReportType)])
+            return self.REPORTFIELDGROUP[self.ReportType+self.SORTINGKEYS_KEYNAME]
         except:
-            print("__ ERROR __ get_sorting_keys__ reporttype = {} List of vars = {}".format(
-                self.ReportType, self.ReportSortingKeysVariables))
+            self.PARAMS.cast_error( "00006","get_sorting_keys: :{:}".format(self.ReportType+self.SORTINGKEYS_KEYNAME))
 
-    def get_keys(self):
-        #try:
-            index1=self.ReportTypesList.index(self.ReportType)
-            stringa2=""
-            stringa2="self."+self.ReportKeysVariables[index1]
-            return eval(stringa2)
-        #except:
-        #    print("STRING passed to eval from get_keys(): >{:}< ".format(stringa2))
-        #    print("__ ERROR __ get_keys__ reporttype = {:} List of vars = {}".format(
-        #        self.ReportType, self.ReportKeys))
-        #    print(self.ReportTypesList)
-        #    print(self.ReportType)
-        #    exit(-1)
+
+
+    
+
 
     def UpdateLastRecordValueByKey(self, mykey, value):
+        if not mykey:
+            print("UpdateLastRecordValueByKey : error : key is null") 
         record= self.Report[len(self.Report)-1]
-        if mykey in self.FIELDLISTS:
+        if mykey in self.FIELDLISTS.keys():
             for x in value:
                 record[self.get_keys().index(mykey)].append(x)
         else:
             record[self.get_keys().index(mykey)]=value
 
+
     def FindRecordByKeyValue(self, mykey, value):
         MyFieldIndex=self.get_keys().index(mykey)
         for x in self.Report:
             if x[MyFieldIndex]==value:
-                return x           
-        #print("ERROR Class report,FindRecordByKeyValue : record with value {:} not found in field with key {:} ".format(mykey,value))
-        return []
+                return x  
+        return []        
 
-    def appendnewrecord(self, newrecord):
+
+    def AppendRecordToReport(self, newrecord):
         self.Report.append(newrecord)
 
     def length(self):
@@ -380,7 +590,7 @@ class report(parameters):
     def addemptyrecord(self):
         myrecord=[]
         for mykey in self.get_keys():
-            if mykey in self.FIELDLISTS:
+            if mykey in self.FIELDLISTS.keys():
                 value=[]
             else:
                 value=""
@@ -394,61 +604,69 @@ class report(parameters):
         return retval
 
 
-    # Associates  VM to HOSTS
-    # ----------------------------------
-    def cmpt_to_agglist(self, mynodo, agglist):
-        appartenenza_nodo = []
-        for item in agglist:
-            if mynodo in item["hosts"]:
-                appartenenza_nodo.append(str(item["name"]))
-        if DEBUG >= 3:
-            print(
-                "--- DEBUG --- for nodo={:s} agglist={:s}".format(mynodo, appartenenza_nodo))
-        return appartenenza_nodo
+
+    
+    def calc_max_percentage(self,num1, den1, num2, den2):
+
+        retval= int(100*max(float (num1) / float (den1) , float (num2)/ float (den2)))
+
+        return retval
+
 #---------------------------------------------------
 #   Receives a Report Record, produces as return value a 2D Array containing one record per Line to be printed with wrapping of text beyond FieldLength
 #---------------------------------------------------
     def LineWrapper(self, record):
         var_Keys=self.get_keys()
         Lines=[[]]
-        MaxRows=8
+        MaxRows=30
         Lines=[['' for j in range(len(var_Keys) )] for i in range(MaxRows)]
         MaxRows=0
-
-        for ReportKeyItem in var_Keys:
-            RecordEntryIndex =var_Keys.index(ReportKeyItem)
-            var_FieldLen = self.get_fieldlength(ReportKeyItem)
-            var_RecordEntry= record[RecordEntryIndex]  
-            if type(var_RecordEntry)== list:
-                var_Entry=""
-                for ListItem in var_RecordEntry:
-                    var_Entry+=ListItem
-            else:
-                var_Entry=var_RecordEntry
-            var_RecordEntryLen = len(var_Entry)
-            RowsValue = math.ceil(var_RecordEntryLen/var_FieldLen)
-            if RowsValue>MaxRows:
-                MaxRows=RowsValue
-
-            for NofLinesPerRecEntry in range(RowsValue):
-                stringa_start = NofLinesPerRecEntry*var_FieldLen
-                if (var_RecordEntryLen> stringa_start+ var_FieldLen  ):
-                    stringa_end = (1+NofLinesPerRecEntry)*var_FieldLen
+        try: #CHANGETHIS
+            myunwrappedline=''
+            for ReportKeyItem in var_Keys:
+                RecordEntryIndex =var_Keys.index(ReportKeyItem)
+                var_FieldLen = self.get_fieldlength(ReportKeyItem)
+                var_RecordEntry= record[RecordEntryIndex]  
+                if type(var_RecordEntry)== list:
+                    var_Entry=""
+                    for ListItem in var_RecordEntry:
+                        var_Entry+=ListItem
                 else:
-                    stringa_end =  var_RecordEntryLen
-                newItem=var_Entry[stringa_start:stringa_end]
-                Lines[NofLinesPerRecEntry][RecordEntryIndex]=newItem
+                    var_Entry=var_RecordEntry
+                var_RecordEntryLen = len(var_Entry)
+                
+                stringa1="{:"+str( var_FieldLen  )+"s} |"
+                myunwrappedline+=stringa1.format(var_Entry)  
 
-        retval=[]
-        for i in range(MaxRows):
-            myline=''
-            for j in range(len(var_Keys)):
-                length=self.get_fieldlength(var_Keys[j])
-                stringa1="{:"+str( length  )+"s} |"
-                myline+=stringa1.format(Lines[i][j])    
-            retval.append(myline)
+                RowsValue = math.ceil(var_RecordEntryLen/var_FieldLen)
+                if RowsValue>MaxRows:
+                    MaxRows=RowsValue
 
-        return retval
+                for NofLinesPerRecEntry in range(RowsValue):
+                    stringa_start = NofLinesPerRecEntry*var_FieldLen
+                    if (var_RecordEntryLen> stringa_start+ var_FieldLen  ):
+                        stringa_end = (1+NofLinesPerRecEntry)*var_FieldLen
+                    else:
+                        stringa_end =  var_RecordEntryLen
+                    newItem=var_Entry[stringa_start:stringa_end]
+                    Lines[NofLinesPerRecEntry][RecordEntryIndex]=newItem
+                    
+
+            retval=[]
+            for i in range(MaxRows):
+                myline=''
+                for j in range(len(var_Keys)):
+                    length=self.get_fieldlength(var_Keys[j])
+                    stringa1="{:"+str( length  )+"s} |"
+                    myline+=stringa1.format(Lines[i][j])  
+
+                retval.append(myline)
+
+            return retval,myunwrappedline
+        except:
+            traceback.print_exc(limit=None, file=None, chain=True)
+            self.PARAMS.cast_error("00009","Record:"+str(record))
+
 
 
 #---------------------------------------------------
@@ -474,21 +692,26 @@ class report(parameters):
                 transform = 'value'
             try:
                 if mytype == list:
-                    ListItemLen =self.FIELDLISTSITEMSLENGTH[self.FIELDLISTS.index(columnname)]
+                    if columnname not in self.FIELDLISTS:
+                        print("ERROR 04 - ApplyTransforms")
+                        print("Record_ApplyTransforms: ERROR 04 START - \nMost likely FIELD is a list but it is not present in the application config JSON in the FIELDSLIST, so it is not classified neither list nor else\n")
+                        print("transform=",transform)
+                        print("column:",columnname)
+                        exit(-1)
+                    ListItemLen =self.FIELDLISTS[columnname]
                     FormatString_ListItemField ="{:"+str( ListItemLen)+"s}"
                     NewRecordListEntry=[]
                     for RecordEntry in initialvalue:
                         try:
                             value = FormatString_ListItemField.format(str(RecordEntry))
                             TransformedValue = eval(transform)
-                            #print("Record_ApplyTransforms DEBUG >{:}< >{:}<".format(TransformedValue,columnname))
-                            #NewRecordListEntry.append(FormatString_SingleValue.format(TransformedValue))
                             NewRecordListEntry.append(TransformedValue)
 
                         except:
-                            print("Record_ApplyTransforms: ERROR 05 in applying transform\n")
-                            print("Record_ApplyTransforms: item RecordEntry={:},transform={:}".format(RecordEntry,transform) )
-                            exit(-1)
+                            traceback.print_exc(limit=None, file=None, chain=True)
+
+                            ErrString="ApplyTransforms: item RecordEntry={:},transform={:}".format(RecordEntry,transform)
+                            self.PARAMS.cast_error("00010",ErrString)
                     NewRecord.append(NewRecordListEntry)
                     
                 else:
@@ -496,58 +719,67 @@ class report(parameters):
                     NewRecord.append(FormatString_SingleValue.format(eval(transform)))
 
             except:
-                print("Record_ApplyTransforms: ERROR 04 START - neither list nor else\n")
+                #traceback.print_exc(limit=None, file=None, chain=True)
+                print("######################################")
+                print("Record_ApplyTransforms: ERROR 04 START - \nMost likely FIELD is a list but it is not present in the application config JSON in the FIELDSLIST, so it is not classified neither list nor else\n")
                 print("transform=",transform)
-                print("record:\n")
-                print(record)
-                eval(transform)
+                print("column:",columnname)
+                print("Field to apply is: {:} of type {:} and value {:}".format(key,mytype,value))
+                print("Record: {:} , current field index {:}\n".format(record,row_itemnumber))
+                #print("Result of applying transform ")
+                #eval(transform)
                 print("Record_ApplyTransforms: ERROR 04 - END")
+                print("######################################")
+
                 exit(-1)
 
         return NewRecord
 
-#---------------------------------------------------
-#   REturns Report color by report class
-#---------------------------------------------------      
-    def set_report_color(self):
-        a = str(self.__class__)
-        b= a.replace("'",'').replace("<",'').replace(">","").replace("class ","")
-        if b.find("vm_report")>-1:
-            color=menu.OKGREEN
-        else:
-            color=menu.Yellow
-        return color
+
   # ---------------------------------
     # Print  report Keys header - using Text Wrapping
     # ---------------------------------   
     def print_keys_on_top_of_report(self,pars):
-        color=self.set_report_color()
+        color=self.color
         var_Keys=self.get_keys()
-        NewLines=self.LineWrapper(var_Keys)
+        NewLines,Unwrappedline=self.LineWrapper(var_Keys)
         for myline in NewLines:
-            pars.myprint("{:}".format(myline))
+            pars.myprint("{:}".format(color+myline))
             pars.myprint
-            self.write_line_to_file(color+myline)
+        self.write_line_to_file(color+Unwrappedline)
 
     def print_report_line(self, pars,record):
-        NewRecord=[]
-        NewLines=[[]]
-        NewRecord=self.Record_ApplyTransforms(record)
-        NewLines=self.LineWrapper(NewRecord)
+        try:
+            color=self.color
 
-        for myline in NewLines:
-                pars.myprint("{:}".format(myline))
-                pars.myprint
-                self.write_line_to_file("{:s}".format(myline))
-        return True
+            NewRecord=[]
+            NewLines=[[]]
+            NewRecord=self.Record_ApplyTransforms(record)
+            NewLines,UnWrappedline=self.LineWrapper(NewRecord)
+
+            for myline in NewLines:
+                    if self.ReportType not in pars.APPLICATIONCONFIG_DICTIONARY["ReportsSettings"]["ReportTypesNotToBePrintedOnScreen"]:
+                        pars.myprint("{:}".format(color+myline))
+                        pars.myprint
+            
+            self.write_line_to_file("{:s}".format(UnWrappedline))
+            return True
+        except Exception as err:
+            print("ERROR 06 START")
+            traceback.print_exc(limit=None, file=None, chain=True)
+            print("Record: {:}".format(record))
+            print("NewRecord: {:}".format(NewRecord))
+            print("Newlines: {:}".format(NewLines))
+            print("ERROR 06 END")
+            exit(-1)
 
     # ---------------------------------
     # Print a report ARRAY (list of lists), line by line  - Includes Text Wrapping
     # ---------------------------------
     def print_report(self, pars):
         # REPORT HEADER
-        MyLine = '{0:_^'+str(pars.ScreenWitdh)+'}'
-        color=self.set_report_color()
+        color=self.color
+        MyLine = color+'{0:_^'+str(pars.ScreenWitdh)+'}'
         pars.myprint(MyLine.format(self.name))
         self.write_line_to_file(MyLine.format(self.name)+"\n")
         pars.myprint(MyLine.format(self.State))
@@ -589,9 +821,8 @@ class report(parameters):
         totvcpuavail = 0
         totvcpuused = 0
         retval = []
-        if self.ReportType==self.ReportType_HW:
-            Divisor = "vCPUsAvailPerHV"
-            Dividend = "vCPUsUsedPerHV"
+        Divisor = "vCPUsAvailPerHV"
+        Dividend = "vCPUsUsedPerHV"
 
         for x in self.Report:
             totvcpuavail += x[self.get_keys().index(Divisor)]
@@ -602,9 +833,9 @@ class report(parameters):
             usage = 0
         
         self.ReportTotalUsage=[]
-        if self.ReportType==self.ReportType_HW:
-            retval.append("% OF VCPU USAGE :")
-            retval.append(str(int(usage*100))+"%")
+
+        retval.append("% OF VCPU USAGE :")
+        retval.append(str(int(usage*100))+"%")
 
         retval.append("TOTAL # OF VCPUs USED :")
         retval.append(totvcpuused)
@@ -622,6 +853,7 @@ class report(parameters):
 
     def split_vnfname(self, vmname, resulttype):
         if len(vmname) < 23:
+            return " ## "
             return vmname
         if resulttype == 'vnf':
             return vmname[12:16]
@@ -636,6 +868,9 @@ class report(parameters):
     def tstoshortdate(self, x):
         return x[0:4]+"-"+x[4:6]+"-"+x[6:8]
 
+    def colorvnfname(self,x):
+        raise NotImplementedError("Must override parent")
+
     # Transforms value to MB/GB string format
     def mem_show_as_gb(self, value, convert):
         try:
@@ -648,11 +883,11 @@ class report(parameters):
         except:
             return "??"
     
-
-    def show_as_percentage(self,numerator, denominator, len):
-            value_num=int(numerator)
-            value_den=int(denominator)
-            myvalue= int(100*value_num/value_den)
+    def show_as_percentage(self,myvalue , len):
+#    def show_as_percentage(self,numerator, denominator, len):
+            #value_num=int(numerator)
+            #value_den=int(denominator)
+            #myvalue= int(100*value_num/value_den)
             returnval = "{:>3s}".format(str(myvalue)+"%")
             return returnval.rjust(len)
 
@@ -672,12 +907,17 @@ class report(parameters):
         except:
             print("shorten_az : ERROR : value passed x is {:s}, result of replace is {:s}".format(x,value))
             return "?"         
-class menu():
-    # -------------------------------------------------------------------------------------------------------------------------
-    # -------------------------------------------------------------------------------------------------------------------------
-    #                           CLASS :     MENU
-    # -------------------------------------------------------------------------------------------------------------------------
-    # -------------------------------------------------------------------------------------------------------------------------
+
+    def shortenAAP(self, x):
+        Retval= x.replace("active","A").replace("standby","S")
+        return Retval
+# -------------------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------------------
+#                           CLASS :     MENU
+# -------------------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------------------
+class menu:
+ 
     # -------------------------------------------------------------------------------------------------------------------------
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -696,3 +936,8 @@ class menu():
     Default = '\033[99m'
 
     ColorsList =(OKBLUE,OKCYAN,OKGREEN,WARNING,FAIL,White,Yellow,Magenta,Grey)
+
+
+
+
+

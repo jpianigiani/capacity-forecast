@@ -9,8 +9,8 @@ import itertools
 import math
 import operator
 from datetime import datetime
-from mycapacitymodule import report, menu, dictarray, parameters
-from mycapacitymodule2 import menu_report, rack_report, vm_report, hw_report,totalresults_report
+from mycapacitymodule import *
+from mycapacitymodule2 import *
 
 
 
@@ -27,17 +27,20 @@ def main(arguments):
     MyPARAMSDICT=parameters()
     SRC_DA= dictarray()
     DST_DA= dictarray()
+    ERROR_REPORTBOX = error_report(MyPARAMSDICT)
 
-    SRC_VM_REPORTBOX = vm_report()
-    SRC_HW_REPORTBOX = hw_report()
-    DST_HW_REPORTBOX = hw_report()
-    MyMENU = menu_report()
+
+    SRC_VM_REPORTBOX = vm_report(MyPARAMSDICT)
+    SRC_HW_REPORTBOX = hw_report(MyPARAMSDICT)
+    DST_HW_REPORTBOX = hw_report(MyPARAMSDICT)
+    MyMENU = menu_report(MyPARAMSDICT)
     MyMENU.set_name("MENU")
-    
-    FINAL_REPORTBOX = totalresults_report()
-    FINAL_REPORTBOX.Report=[]
-    SRC_RACK_REPORTBOX = rack_report()
-    DST_RACK_REPORTBOX = rack_report()
+    FINAL_REPORTBOX = totalresults_report(MyPARAMSDICT)
+    FINAL_REPORTBOX.ClearData()
+    SRC_RACK_REPORTBOX = rack_report(MyPARAMSDICT)
+    DST_RACK_REPORTBOX = rack_report(MyPARAMSDICT)
+    SRC_SITE_REPORTBOX = site_report(MyPARAMSDICT)
+    SRC_SERVICEGRAPH_REPORTBOX = servicegraph_report(MyPARAMSDICT)
 
     MyLine = '{0:_^'+str(MyMENU.ScreenWitdh)+'}'
 
@@ -50,15 +53,24 @@ def main(arguments):
         SRC_VM_REPORTBOX.ClearData()
         SRC_HW_REPORTBOX.ClearData()
         SRC_RACK_REPORTBOX.ClearData()
-        
-        #CURRENTSRCSITE=MyPARAMSDICT.paramsdict["SOURCE_SITE_SUFFIX"]
+        SRC_SITE_REPORTBOX.ClearData()
+
+        # SETS THE PARAMETER FOR SOURCE FILES TO CURRENT SOURCE SITE SUFFIX AND LOADS DATA FROM FILES INTO DICTARRAY
+        src_paramname="SOURCE_SITE_SUFFIX"
+        MyPARAMSDICT.paramsdict[src_paramname]=CURRENTSRCSITE
         srcsitename = MyPARAMSDICT.parse_suffisso(CURRENTSRCSITE).upper()
+        del SRC_DA
+        SRC_DA=dictarray()
+        SRC_DA.load_jsons_into_dictarrays(MyPARAMSDICT, src_paramname)
+
+        # CREATE OBJECTS FOR EACH REPORT FOR SOURCE SITE: VM, HW, RACK, SITE; FINALREPORT IS CREATED ONLY IF DEST SITE USED
         FINAL_REPORTBOX.set_name("report-TOTALRESULTS-"+srcsitename)
-        
+  
         SRC_VM_REPORTBOX.set_name("report-SRC-"+srcsitename+SRC_VM_REPORTBOX.ReportType)
         SRC_VM_REPORTBOX.produce_vm_report(MyPARAMSDICT,SRC_DA)
         SRC_VM_REPORTBOX.calculate_report_total_usage(MyPARAMSDICT)
         SRC_VM_REPORTBOX.sort_report(SRC_VM_REPORTBOX.get_sorting_keys())
+
 
         SRC_HW_REPORTBOX.set_name("report-SRC-"+srcsitename+SRC_HW_REPORTBOX.ReportType)
         SRC_HW_REPORTBOX.produce_hw_report(CURRENTSRCSITE,MyPARAMSDICT, SRC_DA)
@@ -68,22 +80,34 @@ def main(arguments):
         SRC_RACK_REPORTBOX.set_name("report-SRC-"+srcsitename+SRC_RACK_REPORTBOX.ReportType)
         SRC_RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,SRC_HW_REPORTBOX)
         SRC_RACK_REPORTBOX.sort_report(SRC_RACK_REPORTBOX.get_sorting_keys())
-        
-    
-        # PRINT SOURCE VM REPORT
+
+        SRC_SITE_REPORTBOX.set_name("report-SRC-"+srcsitename+SRC_SITE_REPORTBOX.ReportType)
+        SRC_SITE_REPORTBOX.produce_site_report(MyPARAMSDICT,SRC_VM_REPORTBOX,SRC_HW_REPORTBOX)
+        SRC_SITE_REPORTBOX.sort_report(SRC_SITE_REPORTBOX.get_sorting_keys())
+
+        SRC_SERVICEGRAPH_REPORTBOX.set_name("report-SRC-"+srcsitename+SRC_SERVICEGRAPH_REPORTBOX.ReportType)
+        SRC_SERVICEGRAPH_REPORTBOX.produce_servicegraphreport(MyPARAMSDICT, SRC_DA)
+        SRC_SERVICEGRAPH_REPORTBOX.sort_report(SRC_SERVICEGRAPH_REPORTBOX.get_sorting_keys())
+        # PRINT EACH REPORT WITH REPORT HEADERS AND HEADER LINES
         if MyPARAMSDICT.is_silentmode()==False:
-            SRC_VM_REPORTBOX.set_state(MyLine.format(menu.OKBLUE+" SOURCE SITE {:} - VM REPORT "+menu.Yellow).format(srcsitename))
+            SRC_VM_REPORTBOX.set_state(MyLine.format(menu.OKBLUE+" SOURCE SITE {:} - VM REPORT ").format(srcsitename))
             SRC_VM_REPORTBOX.print_report(MyPARAMSDICT)
             
-            SRC_HW_REPORTBOX.set_state(MyLine.format(menu.OKBLUE+" SOURCE SITE {:} - HARDWARE REPORT "+menu.Yellow).format(srcsitename))
+            SRC_HW_REPORTBOX.set_state(MyLine.format(menu.OKBLUE+" SOURCE SITE {:} - HARDWARE REPORT ").format(srcsitename))
             SRC_HW_REPORTBOX.print_report(MyPARAMSDICT)  
 
-            SRC_RACK_REPORTBOX.set_state( MyLine.format(menu.OKBLUE+" SOURCE SITE {:} - RACK REPORT "+menu.Yellow).format(srcsitename))
+            SRC_RACK_REPORTBOX.set_state( MyLine.format(menu.OKBLUE+" SOURCE SITE {:} - RACK REPORT ").format(srcsitename))
             SRC_RACK_REPORTBOX.print_report(MyPARAMSDICT)  
+ 
+            SRC_SITE_REPORTBOX.set_state( MyLine.format(menu.OKBLUE+" SOURCE SITE {:} - SITE REPORT ").format(srcsitename))
+            SRC_SITE_REPORTBOX.print_report(MyPARAMSDICT)  
+
+            SRC_SITE_REPORTBOX.set_state( MyLine.format(menu.Grey+" SOURCE SITE {:} - SERVICEGRAPH REPORT ").format(srcsitename))
+            SRC_SERVICEGRAPH_REPORTBOX.print_report(MyPARAMSDICT)
 
         if(SRC_VM_REPORTBOX.length()==0):
-            print("ERROR !! - {:s} service(s) could not be found in {:s}".format(MyPARAMSDICT.paramsdict["SERVICE"], MyPARAMSDICT.paramsdict["SOURCE_SITE_SUFFIX"]))
-            exit(-1)
+            print("WARNING !! - {:} service(s) could not be found in {:}".format(MyPARAMSDICT.paramsdict["SERVICE"], MyPARAMSDICT.paramsdict["SOURCE_SITE_SUFFIX"]))
+            #exit(-1)
 
 
         if MyPARAMSDICT.paramsdict["JUSTSOURCE"]==False:
@@ -205,8 +229,15 @@ def main(arguments):
             stringa1 = MyLine.format(menu.FAIL+"  SUMMARY OF RESULTS "+menu.Yellow)
             MyPARAMSDICT.myprint(MyLine.format(stringa1))
             FINAL_REPORTBOX.print_report(MyPARAMSDICT)
-    # SHOW Parameters dump plus CLI command for subsequent executions via CLI command          
+    # SHOW Parameters dump plus CLI command for subsequent executions via CLI command  
+    ERROR_REPORTBOX.set_name("ERRORS_REPORT")
+    ERROR_REPORTBOX.produce_error_report(MyPARAMSDICT)
+    ERROR_REPORTBOX.sort_report(ERROR_REPORTBOX.get_sorting_keys())
+    ERROR_REPORTBOX.print_report(MyPARAMSDICT)    
+
     MyPARAMSDICT.show_cli_command()
+
+
 
 if __name__ == '__main__':
     main(sys.argv)

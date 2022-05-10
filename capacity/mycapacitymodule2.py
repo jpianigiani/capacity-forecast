@@ -5,23 +5,26 @@ import glob
 import os
 import itertools
 import math
-import re
 import operator
 from   datetime import datetime
 import time
 from operator import itemgetter, attrgetter
 from mycapacitymodule import *
 
+#--------------------------------------------------------------------------------------------------------------
+#------------------------- ############# VM REPORT ############# ----------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
 class vm_report(report):
-    def __init__(self):
-        super().__init__()
-        self.ReportType=super().ReportType_VM
+    def __init__(self,params):
+        super().__init__(params)
+        #self.ReportType=super().ReportType_VM
+        self.ReportType=super().get_reporttype()
         self.ReportTotalUsage=[]
+        self.color=menu.OKGREEN
         # VM REPORT is used as the source (for the capacity-status.py, also for the destination) to create the complete report (LIST of LISTS, one list per VM) of VMs in that site; these are the report keys
-
-
-        self.VM_REPORT_KEYS= self.REPORTFIELDGROUP["VM_Report_Keys"]
-        self.VM_REPORT_SORTINGKEYS = self.REPORTFIELDGROUP["VM_Report_Sorting_Keys"]
+        self.REPORT_KEYS= super().get_keys()
+        self.REPORT_SORTINGKEYS= super().get_sorting_keys()
 
 
     # -----------------------------------------------------------------------
@@ -31,16 +34,28 @@ class vm_report(report):
         # -----------------------------------------------------------------------
         # EXTRACTS FLAVOR PLACEMENT ZONE FROM FLAVOR PROPERTIES RECORD
         # -----------------------------------------------------------------------
-        def parse_flavor_properties(pars,flavorrecord,minidict):
-            try:
-                stringa1 = flavorrecord["Properties"]
-            except KeyError as e:
-                print("ERROR in parse_flavor_properties: flavor {} does not have properties to parse!! Using EXT as default Host Aggregate for this flavor")
-                retval="DT_NIMS_EXT"
+        print(self.__class__)
+        def parse_flavor_properties(pars,flavorrecord):
+            if "Properties" in flavorrecord.keys():
+                MyFlavorPropertiesDict = flavorrecord["Properties"]
+                if len(MyFlavorPropertiesDict)==0:
+                    retval=pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["DefaultFlavorProperties"]
+                    ErrString="Flavor {:}: missing properties!! Using {:} as HostAgg".format(flavorrecord["Name"],retval)
+                    #pars.cast_error("00101",ErrString)
+                    print(ErrString)
+                    retval={}
+                    return retval
+            else:    
+                ErrString="Flavor {:}: missing properties!! Using EXT as HostAgg".format(flavorrecord["Name"])
+                pars.cast_error("00101",ErrString)
+                retval=pars.APPLICATIONCONFIGDICTIONARY["DefaulValue"]["DefaultFlavorProperties"]
+                #DT_NIMS_EXT"
                 return retval
-            lista1 = stringa1.split(',')
+                
+            lista1 = MyFlavorPropertiesDict.split(',')
             mykeys=[]
             myvalues=[]
+
             try:
                 for x in lista1:
                     key=x.split("=")[0].strip()
@@ -50,18 +65,18 @@ class vm_report(report):
                     myvalues.append(val.upper().replace("DTNIMS","DT_NIMS"))
                 minidict={}
                 minidict.fromkeys(mykeys)
+
+                #STICAZZI
                 for x in  myvalues:
                     index=myvalues.index(x)
                     minidict[mykeys[index]]=x
-                #print(json.dumps(minidict,indent=22))
-                if "vnf_type" in minidict.keys():
-                    retval=minidict["vnf_type"]
-                else:
-                    retval='None'
+                return minidict
+
             except:
-                if pars.is_silentmode()==False:
-                    print("ERROR in parse_flavor_properties: {}".format(flavorrecord))
-                retval='None'  
+                traceback.print_exc(limit=None, file=None, chain=True)
+                ErrString="parse_flavor_properties: {}".format(flavorrecord["Name"])
+                pars.cast_error("00102",ErrString)
+                retval={}
         
             return retval
 
@@ -70,109 +85,148 @@ class vm_report(report):
     # -----------------------------------------------------------------------
         SUFFISSO=pars.paramsdict["SOURCE_SITE_SUFFIX"]
 
-        #if pars.paramsdict["SILENTMODE"]==False:
-        #    pars.myprint("REPORT KEYS \n {:s} \n".format( json.dumps(self.get_keys())))
-
-
-        #FLAVOR_LIST=dictarray_object.DICT_ARRAY[3]
-        #VOLUME_LIST=dictarray_object.DICT_ARRAY[4]
-
+     
         TEMP_RES=[]
         minidict={}
+        NEW_SERVICE_ARRAY=[]
+        CopyOfServiceArray= pars.paramsdict["SERVICE"]
+
+        # PARSE PARAMETER=SERVICE AND RETRIEVE RELEVANT OS PROJECT NAMES
+        for PROGETTO in dictarray_object.SERVERDICT:
+            str_PROGETTO=str(PROGETTO)
+            Condition1=str_PROGETTO in pars.paramsdict["SERVICE"] 
+            Condition2 ="ALL" in pars.paramsdict["SERVICE"]
+            Condition3 = pars.paramsdict["ANYSERVICE"]==True
+            for ServiceName in CopyOfServiceArray:
+
+# TOBE CHANGED as AOP and AOP_Inventory will match if AOP is entered
+                Condition4=True
+                if ServiceName[len(ServiceName)-1]==pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["ServiceNameWildCard"]:
+                    Condition4=str_PROGETTO.find(ServiceName[0:len(ServiceName)-1])>-1
+                else:
+                    Condition4=str_PROGETTO==ServiceName
+
+                if Condition1 or Condition2 or Condition3 or Condition4:
+                    NEW_SERVICE_ARRAY.append(str_PROGETTO)
+        pars.paramsdict["SERVICE"]=NEW_SERVICE_ARRAY
+        print("produce_vm_report: parsing the following services: ",NEW_SERVICE_ARRAY)
+        if len(NEW_SERVICE_ARRAY)==0:
+            pars.cast_error("00202","")
+
+
         for item in [ x for x in dictarray_object.HYPERVISOR_LIST if x["State"] == "up"]:
-                nodo = str(item["Hypervisor Hostname"])
-                nomecorto = str(item["Hypervisor Hostname"].split('.')[0])
-                site_name = str(item["Hypervisor Hostname"].split('.')[1])
-                TEMP_RES=[]
+            nodo = str(item["Hypervisor Hostname"])
+            nomecorto = str(item["Hypervisor Hostname"].split('.')[0])
+            site_name = str(item["Hypervisor Hostname"].split('.')[1])
+            TEMP_RES=[]
 
-                for PROGETTO in dictarray_object.SERVERDICT:
+            for PROGETTO in dictarray_object.SERVERDICT:
+                str_PROGETTO=str(PROGETTO)
+                
+                if str_PROGETTO in NEW_SERVICE_ARRAY:
 
-                    str_PROGETTO=str(PROGETTO)
-                    if str_PROGETTO in pars.paramsdict["SERVICE"] or "ALL" in pars.paramsdict["SERVICE"]:
-                        for VM in [ x for x in dictarray_object.SERVERDICT[PROGETTO] if x["Host"] == item["Hypervisor Hostname"]]:
-                            TMP_RES=self.addemptyrecord()
+                    for VM in [ x for x in dictarray_object.SERVERDICT[PROGETTO] if x["Host"] == item["Hypervisor Hostname"]]:
+                        TMP_RES=self.addemptyrecord()
+                        AGGS = dictarray_object.cmpt_to_agglist(nodo)
+                        AZNAME = str(AGGS[0])
+                        HOSTAGGNAME =AGGS[1:]
+                        suffissobreve=str(SUFFISSO[0:14])
+                        VMNAME=str(VM["Name"])
+                        # NEW UPDATE METHOD BY KEY
+                        #self.VMPERPROJECT[PROGETTO].append(VMNAME)
+                        self.UpdateLastRecordValueByKey( "TimeStamp",SUFFISSO[0:14])
+                        self.UpdateLastRecordValueByKey( "Site",site_name)
+                        self.UpdateLastRecordValueByKey( "Rack",nomecorto[21:23])
+                        self.UpdateLastRecordValueByKey( "HypervisorHostname",nodo)
+                        self.UpdateLastRecordValueByKey( "vCPUsAvailPerHV",item["vCPUs"])
+                        self.UpdateLastRecordValueByKey( "vCPUsUsedPerHV",item["vCPUs Used"])
+                        self.UpdateLastRecordValueByKey( "MemoryMBperHV",item["Memory MB"])
+                        self.UpdateLastRecordValueByKey( "MemoryMBUsedperHV",item["Memory MB Used"])
+                        self.UpdateLastRecordValueByKey( "AZ",AZNAME)
+                        self.UpdateLastRecordValueByKey( "HostAggr",HOSTAGGNAME)
+                        self.UpdateLastRecordValueByKey( "Project",str_PROGETTO)
+                        self.UpdateLastRecordValueByKey( "VMname",str(VM["Name"]))
 
-                            AGGS = self.cmpt_to_agglist(nodo, dictarray_object.AGGREGATE_LIST)
-                            AZNAME = str(AGGS[0])
-                            HOSTAGGNAME =AGGS[1:]
-                            suffissobreve=str(SUFFISSO[0:14])
+                        str_VMFLAVORID=str(VM["Flavor ID"])
+                        self.UpdateLastRecordValueByKey( "Lineup",self.split_vnfname(VM["Name"],"Lineup"))
+                        self.UpdateLastRecordValueByKey( "vnfname",self.split_vnfname(VM["Name"],"vnf"))
+                        self.UpdateLastRecordValueByKey( "vnfcname",self.split_vnfname(VM["Name"],"vnfc"))
 
+                        FOUNDFLAVOR=False
+                        Warning=''
+                        for y in dictarray_object.FLAVOR_LIST:
+                            str_FLAVOR=str(y["ID"])
+                            str_VMFLAVORNAME=str(y["Name"])
+    #------------------------------------------------------------------------
+                            # NEW PARSE FLAVORS IMPLEMENTATION
+                            try:
+                                minidict=parse_flavor_properties(pars,y)
+                            except:
+                                print("ERROR 99a:")
+                                traceback.print_exc(limit=None, file=None, chain=True)
+                                print(y)
 
-                            # NEW UPDATE METHOD BY KEY
-                            self.UpdateLastRecordValueByKey( "TimeStamp",SUFFISSO[0:14])
-                            self.UpdateLastRecordValueByKey( "Site",site_name)
-                            self.UpdateLastRecordValueByKey( "Rack",nomecorto[21:23])
-                            self.UpdateLastRecordValueByKey( "HypervisorHostname",nodo)
-                            self.UpdateLastRecordValueByKey( "vCPUsAvailPerHV",item["vCPUs"])
-                            self.UpdateLastRecordValueByKey( "vCPUsUsedPerHV",item["vCPUs Used"])
-                            self.UpdateLastRecordValueByKey( "MemoryMBperHV",item["Memory MB"])
-                            self.UpdateLastRecordValueByKey( "MemoryMBUsedperHV",item["Memory MB Used"])
-                            self.UpdateLastRecordValueByKey( "AZ",AZNAME)
-                            self.UpdateLastRecordValueByKey( "HostAggr",HOSTAGGNAME)
-                            self.UpdateLastRecordValueByKey( "Project",str_PROGETTO)
-                            self.UpdateLastRecordValueByKey( "VMname",str(VM["Name"]))
-
-                            str_VMFLAVORID=str(VM["Flavor ID"])
-                            self.UpdateLastRecordValueByKey( "Lineup",self.split_vnfname(VM["Name"],"Lineup"))
-                            self.UpdateLastRecordValueByKey( "vnfname",self.split_vnfname(VM["Name"],"vnf"))
-                            self.UpdateLastRecordValueByKey( "vnfcname",self.split_vnfname(VM["Name"],"vnfc"))
                             
-                            FOUNDFLAVOR=False
-                            Warning=''
-                            for y in dictarray_object.FLAVOR_LIST:
-                                str_FLAVOR=str(y["ID"])
-                                str_VMFLAVORNAME=str(y["Name"])
-                                str_FLAVORHOSTAGGR=parse_flavor_properties(pars,y,minidict)
-                                if str_FLAVOR == str_VMFLAVORID:
-                                    if len(str_VMFLAVORID)==0:
-                                        #TEMP_RES.append("MISSINGVMFLAVORID")
-                                        self.UpdateLastRecordValueByKey( "Flavor","!! MISSING FLAVOR ID")
+                            #print(json.dumps(minidict,indent=22))
+                            try:
+                                if "vnf_type" in minidict.keys():
+                                    str_FLAVORHOSTAGGR=minidict["vnf_type"]
+                                else:
+                                    str_FLAVORHOSTAGGR='None'
+                                if "hw:cpu_policy" in minidict.keys():
+                                    if (site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabTrafficSites"]+
+                                        pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveTrafficSites"]) and minidict["hw:cpu_policy"].upper()!="DEDICATED":
+                                        Warning= "VM {:} Flavor without hw:cpu_policy set".format(str(VM["Name"]))
+                                        pars.cast_error("00104",Warning)
+                                if "hw:emulator_threads_policy" in minidict.keys():
+                                    if str_PROGETTO.find("NIMS_Core")>-1 and minidict["hw:emulator_threads_policy"].upper()!="SHARE":
+                                            Warning= "VM {:} Flavor without HW:emulator_thread_policy set".format(str(VM["Name"]))
+                                            pars.cast_error("00105",Warning)
+                            except:
+                                print("ERROR 99: produce_vm_report")
+                                traceback.print_exc(limit=None, file=None, chain=True)
+
+                                #print(site_name)
+                                exit(-1)
+                            # END OF NEW PARSE FLAVORS IMPLEMENTATION
+    #------------------------------------------------------------------------
+                            if str_FLAVOR == str_VMFLAVORID:
+                                if len(str_VMFLAVORID)==0:
+                                    self.UpdateLastRecordValueByKey( "Flavor","!! MISSING FLAVOR ID")
+                                    ErrString="VMName: "+str(VM["Name"])+" ;  no Flavor ID associated to VM"
+                                    pars.cast_error("00100",ErrString)
+                                else:
+                                    if len(str_VMFLAVORNAME)==0:
+                                        self.UpdateLastRecordValueByKey( "Flavor","<no name> FlavorID="+str_VMFLAVORID)
+                                        self.UpdateLastRecordValueByKey( "Warning","MissingFlavorNameOnly")
+
+                                        Warning+="MissingFlavorNameOnly; "
                                     else:
-                                        if len(str_VMFLAVORNAME)==0:
-                                            #TEMP_RES.append("<no name> FlavorID="+str_VMFLAVORID)
-                                            self.UpdateLastRecordValueByKey( "Flavor","<no name> FlavorID="+str_VMFLAVORID)
-                                            self.UpdateLastRecordValueByKey( "Warning","MissingFlavorNameOnly")
 
-                                            Warning+="MissingFlavorNameOnly; "
-                                        else:
-                                            #TEMP_RES.append(str_VMFLAVORNAME)	
-                                            self.UpdateLastRecordValueByKey( "Flavor",str_VMFLAVORNAME)
+                                        self.UpdateLastRecordValueByKey( "Flavor",str_VMFLAVORNAME)
 
-                                    #TEMP_RES.append(y["VCPUs"])
-                                    #TEMP_RES.append(y["RAM"])
-                                    #TEMP_RES.append(y["Disk"])
-                                    #TEMP_RES.append(str_FLAVORHOSTAGGR)
 
-                                    self.UpdateLastRecordValueByKey( "vCPUsUSedPerVM",y["VCPUs"])
-                                    self.UpdateLastRecordValueByKey( "RAMusedMBperVM",y["RAM"])
-                                    self.UpdateLastRecordValueByKey( "CephPerVMGB",y["Disk"])
-                                    self.UpdateLastRecordValueByKey( "TargetHostAggr",str_FLAVORHOSTAGGR)
-
-                                    #TEMP_RES.append(self.split_vnfname(VM["Name"],"Lineup"))
-                                    #TEMP_RES.append(self.split_vnfname(VM["Name"],"vnf"))
-                                    #TEMP_RES.append(self.split_vnfname(VM["Name"],"vnfc"))
-
-                                    #self.appendnewrecord(TEMP_RES)
-                                    TEMP_RES=[]
-                                    FOUNDFLAVOR=True
-                                    break
-
-                            if FOUNDFLAVOR==False:	
-                                Warning += "ERROR: FlavorID not present"
-                                #TEMP_RES.append(str(VM["Flavor Name"]+ " n/a"))
-                                #TEMP_RES.append("n/a")
-                                #TEMP_RES.append("n/a")
-                                #TEMP_RES.append("n/a")
-                                #TEMP_RES.append(Warning)
-
-                                self.UpdateLastRecordValueByKey( "Flavor",str(VM["Flavor Name"]+ " n/a"))
-                                self.UpdateLastRecordValueByKey( "vCPUsUSedPerVM","n/a")
-                                self.UpdateLastRecordValueByKey( "RAMusedMBperVM","n/a")
-                                self.UpdateLastRecordValueByKey( "CephPerVMGB","n/a")
-                                self.UpdateLastRecordValueByKey( "Warning","ERROR: FlavorID not present")
-
-                                #self.appendnewrecord(TEMP_RES)
+                                self.UpdateLastRecordValueByKey( "vCPUsUSedPerVM",y["VCPUs"])
+                                self.UpdateLastRecordValueByKey( "RAMusedMBperVM",y["RAM"])
+                                self.UpdateLastRecordValueByKey( "CephPerVMGB",y["Disk"])
+                                self.UpdateLastRecordValueByKey( "TargetHostAggr",str_FLAVORHOSTAGGR)
                                 TEMP_RES=[]
+                                FOUNDFLAVOR=True
+                                break
+
+                        if FOUNDFLAVOR==False:	
+                            Warning += "ERROR: FlavorID not present"
+                            self.UpdateLastRecordValueByKey( "Flavor",str(VM["Flavor Name"]+ " n/a"))
+                            self.UpdateLastRecordValueByKey( "vCPUsUSedPerVM","n/a")
+                            self.UpdateLastRecordValueByKey( "RAMusedMBperVM","n/a")
+                            self.UpdateLastRecordValueByKey( "CephPerVMGB","n/a")
+                            self.UpdateLastRecordValueByKey( "Warning","ERROR: FlavorID not present")
+                            ErrString="VMName: "+str(VM["Name"])+" with FlavorName:>"+str(VM["Flavor Name"])+"< :FlavorID not present"
+                            pars.cast_error("00103",ErrString)
+                            TEMP_RES=[]
+
+
+
 
 
     # VM REPORT ONLY
@@ -181,9 +235,8 @@ class vm_report(report):
         totramused = 0
         retval = []
 
-        if self.ReportType==self.ReportType_VM:
-            Item1 = "vCPUsUSedPerVM"
-            Item2 = "RAMusedMBperVM"
+        Item1 = "vCPUsUSedPerVM"
+        Item2 = "RAMusedMBperVM"
         errorSign =False
         for x in self.Report:
             try:
@@ -209,50 +262,45 @@ class vm_report(report):
         self.ReportTotalUsage=retval
         return retval
 
-
-
+#--------------------------------------------------------------------------------------------------------------
+#------------------------- ############# MENU REPORT ############# --------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
 class menu_report(report):
 
-    def __init__(self):
-        super().__init__()
-        self.ReportType=super().ReportType_MENU
+    def __init__(self,params):
+        super().__init__(params)
+        self.ReportType=super().get_reporttype()
         self.ReportTotalUsage=[]
-        self.ReportType=self.ReportType_MENU
         self.name="MENU"
-        self.MENU_REPORT_KEYS= report().REPORTFIELDGROUP["MENU_Report_Keys"]
-        self.MENU_REPORT_SORTINGKEYS = report().REPORTFIELDGROUP["MENU_Report_Sorting_Keys"]
+        self.color=menu.OKCYAN
 
+        self.REPORT_KEYS= super().get_keys()
+        self.REPORT_SORTINGKEYS= super().get_sorting_keys()
+        #self.MENU_REPORT_KEYS= self.REPORTFIELDGROUP["MENU_Report_Keys"]
+        #self.MENU_REPORT_SORTINGKEYS = self.REPORTFIELDGROUP["MENU_Report_Sorting_Keys"]
         screenrows, screencolumns = os.popen('stty size', 'r').read().split()
         self.ScreenWitdh=int(screencolumns)
-        self.SVCNOTTOSHOW = ("service", "admin", "tempest", "c_rally", "DeleteMe", "Kashif")
+        self.SVCNOTTOSHOW =  params.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["ServicesToSkip"]
+        #("service", "admin", "tempest", "c_rally", "DeleteMe", "Kashif")
 
     
 
     def CreatePerSiteProjectReport(self, params):
             
             cleanlist = []
-            sortedlist=[]
-            files = os.listdir(params.PATHFOROPENSTACKFILES)
-
-            files_txt = [i for i in files if i.endswith('.json')]
-            for FileName in files_txt:
-                for FileTypeName in params.FILETYPES:
-                    p = FileName.find(FileTypeName)
-                    if p > -1:
-                        cleanlist.append(FileName[p+len(FileTypeName)+1:FileName.find('.json')])
-                    
-            cleandict = dict.fromkeys(cleanlist)
-            cleanlist = []
-            cleanlist = list(cleandict)
+            cleanlist=params.Get_Clean_Openstack_FilesList()
+            
             index = 0
             newlist = []
 
             ProgNumIndex =self.get_keys().index("Item")
             SiteIndex =self.get_keys().index("Site")
+            SiteTypeIndex =self.get_keys().index("Site")
             DateIndex = self.get_keys().index("Date")
             SuffixIndex =self.get_keys().index("Suffix")
             ProjectsIndex =self.get_keys().index("Projects")
-            self.Report=[]
+            self.ClearData()
 
             for FileName in cleanlist:
                 if len(FileName) == 20:
@@ -263,15 +311,24 @@ class menu_report(report):
                     sitename = "stg810"
                     date = FileName[:14]
                 
+
                 ShortDate = self.tstoshortdate(FileName)
                 self.addemptyrecord()
                 self.UpdateLastRecordValueByKey("Item",index)
                 self.UpdateLastRecordValueByKey("Site",sitename)
+                self.UpdateLastRecordValueByKey("SiteType",params.SiteType(sitename))
+
                 self.UpdateLastRecordValueByKey("Date",ShortDate)
                 self.UpdateLastRecordValueByKey("Suffix",FileName)  
-                self.UpdateLastRecordValueByKey("Projects",self.load_svcs_by_prefix(params,FileName)) 
+                ListOfProjPerSuffix=[]
+                for Item in self.load_svcs_by_prefix(params,FileName):
+                    ListOfProjPerSuffix.append("{:} ({:})".format(Item[0],Item[1]))
+                self.UpdateLastRecordValueByKey("Projects",ListOfProjPerSuffix) 
             index = 0 
-            self.Report.sort(key=lambda x: x[DateIndex]+x[SiteIndex], reverse=True)
+            self.Report.sort(key=lambda x: (x[DateIndex],x[SiteTypeIndex],x[SiteIndex]), reverse=True)
+            
+
+            #self.sort_report(self.get_sorting_keys())
             for Rec in self.Report:
                 Rec[ProgNumIndex]=index
                 index+=1
@@ -287,10 +344,12 @@ class menu_report(report):
         ReportKeys =self.get_keys()
         ProgNumIndex =ReportKeys.index("Item")
         SiteIndex =ReportKeys.index("Site")
+        SiteTypeIndex =ReportKeys.index("SiteType")
+
         DateIndex = ReportKeys.index("Date")
         SuffixIndex =ReportKeys.index("Suffix")
         ProjectsIndex =ReportKeys.index("Projects")
-        EachProjectLength = ListItemLen =self.FIELDLISTSITEMSLENGTH[self.FIELDLISTS.index("Projects")]
+        EachProjectLength = ListItemLen =self.FIELDLISTS["Projects"]
     # PREPARE THE LIST OF ITEMS
         for Record in self.Report :
             counter = Record[ProgNumIndex]
@@ -322,16 +381,72 @@ class menu_report(report):
 
         return self.print_menu(params,prompt)
 
+ # ------- GET LIST OF PROJECT EXISTING IN SRC SITE ---------------
+    def GetListOfProjectsInSite(self, params, parname):
+
+        os.system("clear")
+        stringalinea1 = '{0:_^'+str(self.ScreenWitdh)+'}'
+        params.myprint(stringalinea1.format( " SERVICES AVAILABLE IN SITE "+params.paramsdict[parname]))
+        results = []
+        for Item in self.load_svcs_by_prefix(params,params.paramsdict[parname]):
+            TMPREC=[]
+            TMPREC.append(0)
+            TMPREC.append(Item[0])
+            TMPREC.append(Item[1])
+            results.append(TMPREC)
+
+        sortedres = sorted(results, key=lambda x: x[0], reverse=False)
+
+        index = 0        
+        for Item in sortedres:
+            Item[0]=index
+            params.myprint("\n\t{:} --- {:30s} --- ({:4d})".format(index, Item[1],Item[2]))
+            index+=1
+        #print(sortedres)
+        src=""
+        ListOfEntries=[]
+        while len(src)==0 or len(ListOfEntries)==0: 
+            src = str(input("\n\tEnter source SERVICES separated by <,> or ALL or string to match Service Name:"))
+            TempListOfEntries= src.split(",")
+            ListOfEntries=[]
+            for i in TempListOfEntries:
+                if i.strip() != '':
+                    ListOfEntries.append(i)
+            print(ListOfEntries)
+
+        res = []
+        ServiceNames=[i[1] for i in sortedres]
+        print(ServiceNames)
+        for EntryItem in ListOfEntries:
+            if EntryItem in ["all", "ALL"]:
+                res = [i for i in ServiceNames]
+                params.paramsdict["ANYSERVICE"]=True
+            elif EntryItem.isdigit():
+                Value=int(EntryItem)
+                res.append(sortedres[Value][1])                
+            else:
+                for ServiceName in ServiceNames:
+                    if EntryItem[len(EntryItem)-1]==params.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["ServiceNameWildCard"]:
+                        CriteriaToMeet=ServiceName.find(EntryItem[0:len(EntryItem)-1])>-1
+                    else:
+                        CriteriaToMeet=ServiceName==EntryItem
+                    if CriteriaToMeet:
+                        res.append(ServiceName)
+
+            print(res)
+            if len(res)==0:
+                params.cast_error("00202","")
+        return res
     # ----------------------------------------------------------
     # - ----- PARSE ARGS AND DEFINE LEVEL OF USER INTERACTIVITY -------
     # this function defines which user inputs to request in user interactive mode based on command line arguments provided
     #
-    def parse_args(self,input,output, src_da, dst_da):
-        # ----------------------------------------------
 
+    def split_cli_args(self,input,output):
         # ----------------------------------------------------------
         # PARSE ARGUMENTS PASSED TO COMMAND
         # ----------------------------------------------------------
+
         Counter=0
         l=0
         try:
@@ -356,23 +471,30 @@ class menu_report(report):
                             output.paramsdict[key]=val
                 Counter+=1
         except: 
-            print("ERROR - parse_args - The following command line parameter is not correct : {:s}".format(x))
+            print("ERROR - split_cli_args - The following command line parameter is not correct : {:s}".format(Word))
             exit(-1)
         l+=1
+        print(json.dumps(output.paramsdict,indent=22))
 
+
+    def parse_args(self,input,output, src_da, dst_da):
+        # ----------------------------------------------
+        self.split_cli_args(input,output)
         #SOURCE SITE(S)
         # If SOURCE_SITE_SUFFIX CLI argument is not present, the User Interface fetching the input is shown and user input is returned to the parameters dict
         parname = "SOURCE_SITE_SUFFIX"
         Parname_Of_Sitelist="SRCSITESLIST"
         MyPrompt="Source site"
         output.paramsdict[Parname_Of_Sitelist]=[]
+
         if len(output.paramsdict[parname])==0:
             MySiteSuffixValue=self.ShowProjectsPerSiteandGetInput( output,MyPrompt)
             output.paramsdict[parname]=MySiteSuffixValue
             output.paramsdict[Parname_Of_Sitelist].append(MySiteSuffixValue)
         else:
             myvaluetosearchfiles=output.paramsdict[parname]
-            for SiteFileSuffix in output.GetListOfFilesFromSuffixMatch(myvaluetosearchfiles):
+            MyList=output.GetListOfFilesFromSuffixMatch(myvaluetosearchfiles)
+            for SiteFileSuffix in MyList:
                 output.paramsdict[Parname_Of_Sitelist].append(SiteFileSuffix)
             output.paramsdict[parname]=output.paramsdict[Parname_Of_Sitelist][0]            
             #MySiteSuffixValue=output.paramsdict[parname]
@@ -406,28 +528,31 @@ class menu_report(report):
         if len(output.paramsdict["SERVICE"])==0:
             parname = "SOURCE_SITE_SUFFIX"
             src_da.load_jsons_into_dictarrays(output,parname)
-            output.paramsdict["SERVICE"]=src_da.GetListOfProjectsInSite(output,self )
+            if output.paramsdict["ANYSERVICE"]==False:
+                output.paramsdict["SERVICE"]=self.GetListOfProjectsInSite(output,parname )
 
         output.myprint("------------------ LIST OF PARAMETER ARGUMENTS ---------------------------")	
         output.myprint(json.dumps(output.paramsdict,indent=30))
 
-        return l
-    
+        return 1
+        # MERGE WITH 
+   
 
     def load_svcs_by_prefix(self, params, SUFFISSO):
     # --------------------------------------------------------------
     # Load site data files and finds the list of projects (and total vCPUs for each) in each site:suffix
             COUNT=0
             RESULT=[]
-
+            TMPRES=[]
             try:
                     ITEM="server_dict"
                     FILENAME = params.PATHFOROPENSTACKFILES + "/"+ "openstack_" + ITEM + "_" + SUFFISSO +  ".json"
                     with open(FILENAME, 'r') as file1:
-                            LOCALSERVERDICT= json.load(file1)
+                                LOCALSERVERDICT= json.load(file1)
                     ITEM="flavor_list"
                     FILENAME = params.PATHFOROPENSTACKFILES + "/"+ "openstack_" + ITEM + "_" + SUFFISSO +  ".json"
                     with open(FILENAME, 'r') as file1:
+                            #print("DEBUG load_svcs_by_prefix .. loading {:s} ".format(FILENAME))
                             FLAVOR_LIST= json.load(file1)
                     for PROGETTO in LOCALSERVERDICT:
                                     found=False
@@ -446,10 +571,16 @@ class menu_report(report):
                                                                     if str_FLAVOR == str_VMFLAVORID:
                                                                             VCPU_PER_PRJ+=y["VCPUs"]
 
+                                            TMPRES=[]
+                                            TMPRES.append(str(PROGETTO))
+                                            TMPRES.append(VCPU_PER_PRJ)
+                                            RESULT.append(TMPRES)
 
-                                            RESULT.append(str(PROGETTO)+"("+str(VCPU_PER_PRJ)+")")
+                                            #RESULT.append(str(PROGETTO)+"("+str(VCPU_PER_PRJ)+")")
+
             except (IOError, EOFError) as e:
-                    print("ERROR - file {:s} does not exist".format(FILENAME))
+                    print("load_svcs_by_prefix ERROR 08 START")
+                    print(" opening JSON File {:s} -> does not exist".format(FILENAME))
                     exit(-1)
             return sorted(RESULT)
 
@@ -471,7 +602,7 @@ class menu_report(report):
         for RecordNum in range(len(self.Report )):
             CurrentDate=self.Report[RecordNum][DateIndex]
             if CurrentDate!=PreviousDate:
-                pageends.append(RecordNum-1)
+                pageends.append(RecordNum)
                 pagestarts.append(RecordNum)
                 PreviousDate=CurrentDate
         pageends.append(len(self.Report))
@@ -493,11 +624,11 @@ class menu_report(report):
                 self.print_report_line(params,self.Report[rowindex])
 
             print(FormatString_AllSpaces.format(''))
-            
+            RetvalIndex= self.get_keys().index("Suffix")
             PAGEBACK = ['-', '_', 'b', 'B']
             try:
                 print(
-                    "\nTo change page:\n\t\t\t-Previous Page : -,_,b,B; \n\t\t\t-Next page: any other  letter; \n\t\t\t-Exit: type END :")
+                    "\nTo change page:\n\t\t\t-Previous Page : -,_,b,B; \n\t\t\t-Next page: any other  letter or <CR>; \n\t\t\t-Exit: type END :")
                 userinput = input(
                     "\n\t\t\t--------- Enter {:s} suffix: ".format(prompt))
                 ISNUMBER = userinput.isdigit()               
@@ -516,7 +647,7 @@ class menu_report(report):
                     if src >= pagestarts[index] and src <= pageends[index]:
                         print(
                             "\t\t\t\t ......... INPUT ACCEPTED {:d}.........\n\n".format(src))
-                        retval = self.Report[src][3]
+                        retval = self.Report[src][RetvalIndex]
                         print(
                             "\t\t\t\t\t ---------- USER INPUT=>{:s}<--".format(retval))
                         goon = False
@@ -537,7 +668,6 @@ class menu_report(report):
                     index += value
                     goon = True
 
-                print(ISNULL,ISNUMBER)
 
             except (ValueError) as e:
                 goon = False
@@ -549,25 +679,32 @@ class menu_report(report):
                 index = index % len(pagestarts)
                 goon = True
 
-    
-    
-class hw_report(report):
-    def __init__(self):
-        super().__init__()
-        self.ReportType=super().ReportType_HW
-        self.ReportTotalUsage=[]
 
-        self.HW_REPORT_KEYS= report().REPORTFIELDGROUP["HW_Report_Keys"]
-        self.HW_REPORT_SORTINGKEYS = report().REPORTFIELDGROUP["HW_Report_Sorting_Keys"]
+
+#--------------------------------------------------------------------------------------------------------------
+#------------------------- ############# HW REPORT ############# ----------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------    
+class hw_report(report):
+    def __init__(self,params):
+        super().__init__(params)
+
+        self.ReportType=super().get_reporttype()
+        self.ReportTotalUsage=[]
+        self.color=menu.Yellow
+
+        self.REPORT_KEYS= super().get_keys()
+        self.REPORT_SORTINGKEYS= super().get_sorting_keys()
+        #self.HW_REPORT_KEYS= self.REPORTFIELDGROUP["HW_Report_Keys"]
+        #self.HW_REPORT_SORTINGKEYS = self.REPORTFIELDGROUP["HW_Report_Sorting_Keys"]
+
 
     # ---------------------------------------------------------------------------------------------------
     # Produces a report (list of lists); one row per hardware compute based on the global ARRAY of (list,dict) passed as parameter. 
     # ---------------------------------------------------------------------------------------------------
     def produce_hw_report(self,SUFFISSO, pars, dst_dictarray_object ):
-            #SUFFISSO = pars.paramsdict["DESTINATION_SITE_SUFFIX"]
             self.Report=[]
             TEMP_RES=[]
-            #("TimeStamp", "Site", "Rack", "HypervisorHostname", "vCPUsAvailPerHV", "vCPUsUsedPerHV", "MemoryMBperHV", "MemoryMBUsedperHV", "AZ", "HostAggr")
             for item in [ x for x in dst_dictarray_object.HYPERVISOR_LIST if x["State"] == "up"]:
                 nodo = str(item["Hypervisor Hostname"])
                 nomecorto = str(item["Hypervisor Hostname"].split('.')[0])
@@ -584,7 +721,7 @@ class hw_report(report):
                 self.UpdateLastRecordValueByKey( "vCPUsAvailPerHV",item["vCPUs"])
                 self.UpdateLastRecordValueByKey( "MemoryMBperHV",item["Memory MB"])             
                   
-                AGGS =self.cmpt_to_agglist(nodo, dst_dictarray_object.AGGREGATE_LIST)
+                AGGS =dst_dictarray_object.cmpt_to_agglist(nodo)
                 self.UpdateLastRecordValueByKey( "AZ",AGGS[0])               
                 self.UpdateLastRecordValueByKey( "HostAggr",AGGS[1:]) 
 
@@ -601,7 +738,7 @@ class hw_report(report):
                     self.UpdateLastRecordValueByKey( "MemoryMBUsedperHV",item["Memory MB Used"])  
                     #self.UpdateLastRecordValueByKey( "ExistingVMs",WHATTODO??)               
                     self.UpdateLastRecordValueByKey( "ExistingVMs",dst_dictarray_object.get_vms_by_computenode(nodo)) 
-                    self.UpdateLastRecordValueByKey( "PctUsageOfCmpt",int(100*(item["vCPUs Used"]/item["vCPUs"])))
+                    self.UpdateLastRecordValueByKey( "PctUsageOfCmpt",self.calc_max_percentage(item["vCPUs Used"],item["vCPUs"],item["Memory MB Used"],item["Memory MB"]))
                 EmptyVMList=[]
                 self.UpdateLastRecordValueByKey( "NewVMs",EmptyVMList) 
 
@@ -803,20 +940,29 @@ class hw_report(report):
             #    exit(-1)
 
 
+#--------------------------------------------------------------------------------------------------------------
+#------------------------- ############# RACK REPORT ############# --------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
 class rack_report(report):
     # REPORT USED TO STORE COMPUTED DATA DURING AZ OPTIMIZATION
     
 
     RacksPerAZ = 2
 
-    def __init__(self):
-        super().__init__()
-        self.ReportType=super().ReportType_RACK
+    def __init__(self,params):
+        super().__init__(params)
+        #self.ReportType=super().ReportType_RACK
+        self.ReportType=super().get_reporttype()
+
         self.Report=[]
         self.ReportTotalUsage=[]
+        self.color=menu.OKBLUE
 
-        self.RACK_REPORT_KEYS= self.REPORTFIELDGROUP["RACK_Report_keys"]
-        self.RACK_REPORT_SORTINGKEYS = self.REPORTFIELDGROUP["RACK_Report_Sorting_Keys"]
+        self.REPORT_KEYS= super().get_keys()
+        self.REPORT_SORTINGKEYS= super().get_sorting_keys()
+        #self.RACK_REPORT_KEYS= self.REPORTFIELDGROUP["RACK_Report_keys"]
+        #self.RACK_REPORT_SORTINGKEYS = self.REPORTFIELDGROUP["RACK_Report_Sorting_Keys"]
 
         self.RacksPerAZ=self.RACKOPTPARAMETERS["RacksPerAZ"]
         self.Rack_Opt_Memory={}
@@ -847,6 +993,7 @@ class rack_report(report):
         ramused_Rackindex=MyRackKeys.index("RAMUsedperRack")
         rack_Rackindex=MyRackKeys.index("Rack")
         az_Rackindex=MyRackKeys.index("AZ")
+        PctUsage_Rackindex=MyRackKeys.index("PctUsageOfRk")
 
         self.Report=[]
         conta=0
@@ -855,29 +1002,26 @@ class rack_report(report):
             RackFound=False
             MyRackRecord=self.FindRecordByKeyValue("Rack",RackValueFromHWReport)
             
-            #print(" {:d} --Compute {:s} .. found record {:}".format(conta,myRecord[cmpt_hwindex],MyRackRecord))
             conta+=1
 
             if len(MyRackRecord)==0 :
                 self.addemptyrecord()
-                #racks.append(RackValueFromHWReport)
                 self.UpdateLastRecordValueByKey("Rack",RackValueFromHWReport)
-                #azperrack.append(myRecord[azindex])
                 self.UpdateLastRecordValueByKey("AZ",myRecord[az_hwindex])
-                #cpuperrack.append(0)
                 self.UpdateLastRecordValueByKey("VCPUsAvailPerRack",myRecord[vcpuavail_hwindex])                
-                #ramperrack.append(0)
                 self.UpdateLastRecordValueByKey("RAMperRack",myRecord[ramavail_hwindex])                
-                #cpuperrack.append(0)
                 self.UpdateLastRecordValueByKey("VCPUsUsedPerRack",myRecord[vcpuused_hwindex])                
-                #ramperrack.append(0)
                 self.UpdateLastRecordValueByKey("RAMUsedperRack",myRecord[ramused_hwindex])
                 self.UpdateLastRecordValueByKey("NOfComputes",1)
+                self.UpdateLastRecordValueByKey("PctUsageOfRk",0)
+
+
             else:
                 MyRackRecord[vcpuavail_Rackindex]+=myRecord[vcpuavail_hwindex]
                 MyRackRecord[ramavail_Rackindex]+=myRecord[ramavail_hwindex]
                 MyRackRecord[vcpuused_Rackindex]+=myRecord[vcpuused_hwindex]
                 MyRackRecord[ramused_Rackindex]+=myRecord[ramused_hwindex]
+                MyRackRecord[PctUsage_Rackindex]=self.calc_max_percentage(myRecord[vcpuused_hwindex],myRecord[vcpuavail_hwindex],myRecord[ramused_hwindex],myRecord[ramavail_hwindex])
                 MyRackRecord[nofcmpts_Rackindex]+=1
 
 
@@ -955,15 +1099,139 @@ class rack_report(report):
             file1.close
         return True
 
-class totalresults_report(report):
 
-    def __init__(self):
-        super().__init__()
-        self.TOTALRESULTS_REPORT_KEYS= report().REPORTFIELDGROUP["TOTALRESULTS_Report_keys"]
-        self.TOTALRESULTS_REPORT_SORTINGKEYS = report().REPORTFIELDGROUP["TOTALRESULTS_Report_Sorting_Keys"]
-        self.ReportType=super().ReportType_TOTALRESULTS
+#--------------------------------------------------------------------------------------------------------------
+#------------------------- ############# SITE REPORT ############# --------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+class site_report(report):
+    def __init__(self,params):
+        super().__init__(params)
+        self.ReportType=super().get_reporttype()
         self.ReportTotalUsage=[]
         self.Report=[]
+        self.color=menu.FAIL
+
+        self.REPORT_KEYS= super().get_keys()
+        self.REPORT_SORTINGKEYS= super().get_sorting_keys()
+        #self.SITE_REPORT_KEYS= self.REPORTFIELDGROUP["SITE_Report_Keys"]
+        #self.SITE_REPORT_SORTINGKEYS = self.REPORTFIELDGROUP["SITE_Report_Sorting_Keys"]
+
+
+#   PRODUCE PER SITE PER PROJECT USAGE SUMMARY REPORT , called SITE REPORT
+    def produce_site_report(self,pars,  SRC_VM_REPORTBOX, SRC_HW_REPORTBOX):
+        self.ClearData()
+        Sitename=pars.parse_suffisso( pars.paramsdict["SOURCE_SITE_SUFFIX"])
+        SRCVMReportKeys= SRC_VM_REPORTBOX.get_keys()
+        SrcvCPUsUSedPerVMIndex =SRCVMReportKeys.index("vCPUsUSedPerVM")
+        SrcRAMusedMBperVMIndex = SRCVMReportKeys.index("RAMusedMBperVM")
+        SrcProjectperVMIndex = SRCVMReportKeys.index("Project")
+        
+        SRCHWReportKeys=SRC_HW_REPORTBOX.get_keys()
+        SRC_VCPUsPerCmpIndex=SRCHWReportKeys.index("vCPUsAvailPerHV")
+        SRC_RAMPerCmpIndex=SRCHWReportKeys.index("MemoryMBperHV")
+        SRC_VCPUsUsedPerCmpIndex=SRCHWReportKeys.index("vCPUsUsedPerHV")
+        SRC_RAMUsedPerCmpIndex=SRCHWReportKeys.index("MemoryMBUsedperHV")
+
+        TotalVMs=0
+        TotalVCPUUsed=0
+        TotalRAMUsed=0
+        TotalVCPUAvail=0
+        TotalRAMAVail=0
+        ProjectsInSite=[]
+        VMsPerProjectInSite=[]
+        VCPUPerProjectInSite=[]
+        RAMPerProjectInSite=[]
+        PctUsage=[]
+        VCPUInSite=[]
+        RAMInSite=[]
+        VCPUAvailPerSite=0
+        RAMAvailPerSite=0
+        VCPUUsedPerSite=0
+        RAMUsedPerSite=0
+
+       # "SITE_Report_Keys": ["Site","Project",
+       # "NOfVMs","VCPUsUsed", "VCPUsAvail","RAMUsed" ,"RAMAvail","PctUsageOfCmpt"  ],
+
+        for srccompute in SRC_HW_REPORTBOX.Report:
+            VCPUAvailPerSite+=srccompute[SRC_VCPUsPerCmpIndex]
+            RAMAvailPerSite+=srccompute[SRC_RAMPerCmpIndex]
+            VCPUUsedPerSite+=srccompute[SRC_VCPUsUsedPerCmpIndex]
+            RAMUsedPerSite+=srccompute[SRC_RAMUsedPerCmpIndex]
+
+        for srcvm in SRC_VM_REPORTBOX.Report:
+            CurrentVMProject =srcvm[SrcProjectperVMIndex] 
+
+            CurrentVMVCPUs=srcvm[SrcvCPUsUSedPerVMIndex]
+            CurrentVMRAM=srcvm[SrcRAMusedMBperVMIndex]
+            
+
+            if CurrentVMProject not in ProjectsInSite:
+                ProjectsInSite.append(CurrentVMProject)
+                VMsPerProjectInSite.append(0)
+                VCPUPerProjectInSite.append(0)
+                RAMPerProjectInSite.append(0)
+                VCPUInSite.append(VCPUAvailPerSite)
+                RAMInSite.append(RAMAvailPerSite)
+                PctUsage.append(0)
+            else:
+                IndexToUpdate=ProjectsInSite.index(CurrentVMProject)
+                VMsPerProjectInSite[IndexToUpdate]+=1
+                try:
+                    if type(CurrentVMVCPUs)!=int or  type(CurrentVMRAM)!=int:
+                        CurrentVMVCPUs=0
+                        CurrentVMRAM=0
+                    VCPUPerProjectInSite[IndexToUpdate]+=int(CurrentVMVCPUs)
+                    RAMPerProjectInSite[IndexToUpdate]+=int(CurrentVMRAM)
+
+                except:
+                    CurrentVMVCPUs=0
+                    CurrentVMRAM=0
+                    Errstring="produce_site_report : VM {:} has no associated flavor. Setting VCPU=0 and RAM=0".format(srcvm[SRCVMReportKeys.index("VMname")])
+                    print(Errstring)
+                    pars.cast_error("00100", Errstring) 
+                TotalVMs+=1
+                TotalVCPUUsed+=CurrentVMVCPUs
+                TotalRAMUsed+=CurrentVMRAM
+                PctUsage[IndexToUpdate]=self.calc_max_percentage( VCPUPerProjectInSite[IndexToUpdate],VCPUAvailPerSite, RAMPerProjectInSite[IndexToUpdate],RAMAvailPerSite)
+
+        ProjectsInSite.append("TOTAL PER SITE")
+        VMsPerProjectInSite.append(TotalVMs)
+        VCPUPerProjectInSite.append(VCPUUsedPerSite)
+        RAMPerProjectInSite.append(RAMUsedPerSite)
+        VCPUInSite.append(VCPUAvailPerSite)
+        RAMInSite.append(RAMAvailPerSite)
+        PctUsage.append(self.calc_max_percentage( VCPUUsedPerSite,VCPUAvailPerSite, RAMUsedPerSite,RAMAvailPerSite))
+
+        for Counter in range(len(ProjectsInSite)):
+            MyRec=self.addemptyrecord()
+            self.UpdateLastRecordValueByKey("Site",Sitename)
+            self.UpdateLastRecordValueByKey("Project",ProjectsInSite[Counter])
+            self.UpdateLastRecordValueByKey("NOfVMs",VMsPerProjectInSite[Counter])
+            self.UpdateLastRecordValueByKey("VCPUsUsed",VCPUPerProjectInSite[Counter])
+            self.UpdateLastRecordValueByKey("VCPUsAvail",VCPUInSite[Counter])
+            self.UpdateLastRecordValueByKey("RAMUsed",RAMPerProjectInSite[Counter])
+            self.UpdateLastRecordValueByKey("RAMAvail",RAMInSite[Counter])
+            self.UpdateLastRecordValueByKey("PctUsage",PctUsage[Counter])
+
+
+
+#--------------------------------------------------------------------------------------------------------------
+#------------------------- ############# TOTALRESULTS REPORT ############# ------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+class totalresults_report(report):
+
+    def __init__(self,params):
+        super().__init__(params)
+        self.ReportType=super().get_reporttype()
+        self.REPORT_KEYS= super().get_keys()
+        self.REPORT_SORTINGKEYS= super().get_sorting_keys()
+        #self.TOTALRESULTS_REPORT_KEYS= self.REPORTFIELDGROUP["TOTALRESULTS_Report_keys"]
+        #self.TOTALRESULTS_REPORT_SORTINGKEYS = self.REPORTFIELDGROUP["TOTALRESULTS_Report_Sorting_Keys"]
+        self.ReportTotalUsage=[]
+        self.Report=[]
+        self.color=menu.OKGREEN
 
     
     # ----------------------------------------------------------------------------------------------------------------------------------------
@@ -1018,7 +1286,6 @@ class totalresults_report(report):
         # CLEAR NEW VMs on DST REPORT
         for dstcmp in DST_REPORTBOX.Report:
             dstcmp[DstNewVMsIndex] = []
-
 
         # GO THROUGH ALL VMs in SOURCE REPORT ONE BY ONE....
 
@@ -1106,4 +1373,192 @@ class totalresults_report(report):
         MyRecord[TotalRepoKeys.index("Outcome")]=Description
 
         return result
+
+
+#--------------------------------------------------------------------------------------------------------------
+#------------------------- ############# ERROR REPORT ############# -------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+class error_report(report):
+    def __init__(self,params):
+        super().__init__(params)
+        self.ReportType=super().get_reporttype()
+        self.ReportTotalUsage=[]
+        self.color=menu.White
+
+        self.REPORT_KEYS= super().get_keys()
+        self.REPORT_SORTINGKEYS= super().get_sorting_keys()
+        #self.ERROR_REPORT_KEYS= self.REPORTFIELDGROUP["ERROR_Report_Keys"]
+        #self.ERROR_REPORT_SORTINGKEYS = self.REPORTFIELDGROUP["ERROR_Report_Sorting_Keys"]
+        self.Report=[]
+    
+    def produce_error_report(self,pars):
+        self.Report=pars.ERROR_REPORT
+
+#--------------------------------------------------------------------------------------------------------------
+#------------------------- ############# SERVICE GRAPH ############# ----------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------- 
+class servicegraph_report(report):
+
+    def __init__(self,params):
+        super().__init__(params)
+        self.ReportType=super().get_reporttype()
+        self.Report=[]
+        self.ReportTotalUsage=[]
+        self.color=menu.OKBLUE
+
+        self.REPORT_KEYS= super().get_keys()
+        self.REPORT_SORTINGKEYS= super().get_sorting_keys()
+        screenrows, screencolumns = os.popen('stty size', 'r').read().split()
+
+
+    def crawl_dict(self, mydictbranch, KeysArray, MyType):
+        MyBranch = mydictbranch
+        for MyKey in KeysArray:
+            if MyKey in MyBranch.keys():
+                MyBranch=MyBranch[MyKey]
+                MyCurrentType=type(MyBranch[MyKey])
+            else:
+                return type(MyType)() 
+        return MyBranch
+
+    def produce_servicegraphreport(self, params, dictarray_object):
+        if params.get_param_value("SERVICEGRAPHENABLED")==False:
+            print("ERROR: produce_servicegraphreport :Service Graph data load not enabled in CLI parameters")
+            return -1
+        if dictarray_object.SKIPSERVICEGRAPH:
+            MyName=dictarray_object.__class__
+            ErrString = "produce_servicegraphreport: {:} has no complete Dictarrays for Servicegraph".format(MyName)
+            params.cast_error("00201",ErrString)
+            return
+        ReportKeys= self.get_keys()
+
+        self.ClearData()
+        VirtualPortIndex = ReportKeys.index("VirtualPort")
+        
+#"SERVICEGRAPH_Keys": ["Project","vnfname","VMname","VirtualPort","PacketMode", "AAP", "Network","Subnet"],
+        #print(servicename)
+        #for PROGETTO in [ Zed for Zed in dictarray_object.SERVERDICT if Zed == servicename]:
+        for PROGETTO in [ Zed for Zed in dictarray_object.SERVERDICT if Zed in params.paramsdict["SERVICE"]]:
+            print("-- produce_servicegraphreport for "+PROGETTO)
+            for VMRecord in dictarray_object.SERVERDICT[PROGETTO]:
+                VMName=VMRecord["Name"]
+                VM_UUID= VMRecord["ID"]
+                VMHost= VMRecord["Host"]
+                VMFlavorId=VMRecord["Flavor ID"]
+
+            #for VMReportRecord in [x for x in vm_reportbox.Report if x[ProjectNameIndex]==servicename]:
+                for VirtualMachineInterface in dictarray_object.VIRTUALPORT_DICT["virtual-machine-interfaces"]:
+                    #print(json.dumps(VirtualMachineInterface,indent=22))
+
+                    CurrentVMIDict= VirtualMachineInterface["virtual-machine-interface"]
+
+                    CurrentVMI_FQDN= CurrentVMIDict["fq_name"]
+                    ProjectName =CurrentVMI_FQDN[1]
+                    if ProjectName==PROGETTO:
+                        self.addemptyrecord()
+                        self.UpdateLastRecordValueByKey("VMname",VMName)
+                        self.UpdateLastRecordValueByKey("vnfname",self.split_vnfname(VMName,"vnf"))
+
+                        self.UpdateLastRecordValueByKey("Project",CurrentVMI_FQDN[1])
+
+                        self.UpdateLastRecordValueByKey("VirtualPort",CurrentVMIDict["name"])
+                        if "virtual_machine_interface_disable_policy" in CurrentVMIDict.keys():
+                            VMI_PacketModeAttr = CurrentVMIDict["virtual_machine_interface_disable_policy"]
+                        else:
+                            VMI_PacketModeAttr= False
+                        self.UpdateLastRecordValueByKey("PacketMode",VMI_PacketModeAttr)
+
+                        VMI_VirtualNetworkAttr = CurrentVMIDict["virtual_network_refs"][0]["uuid"]
+
+                        VMI_MirrorTo=""
+                        if "virtual_machine_interface_properties" in CurrentVMIDict.keys():
+                            VMI_IntfPropertiesDict= CurrentVMIDict["virtual_machine_interface_properties"]
+                            if "interface_mirror" in VMI_IntfPropertiesDict.keys():
+                                if VMI_IntfPropertiesDict["interface_mirror"]:
+                                    if "mirror_to" in VMI_IntfPropertiesDict["interface_mirror"].keys():
+                                        VMI_MirrorTo=VMI_IntfPropertiesDict["interface_mirror"]["mirror_to"]["analyzer_name"]+" (" + VMI_IntfPropertiesDict["interface_mirror"]["mirror_to"]["analyzer_ip_address"]+")"
+                                else:
+                                        VMI_MirrorTo="Null"
+                            else:
+                                    VMI_MirrorTo="None"
+                        self.UpdateLastRecordValueByKey("MirrorTo",VMI_MirrorTo)
+                        
+
+                        if "virtual_machine_interface_allowed_address_pairs" in CurrentVMIDict.keys():
+                            VMI_AAPDict = CurrentVMIDict["virtual_machine_interface_allowed_address_pairs"]
+                            #print(json.dumps(VMI_AAPDict,indent=6))
+                            if "allowed_address_pair" in VMI_AAPDict.keys():
+                                VMI_AAPList = VMI_AAPDict["allowed_address_pair"]
+
+                                TMPREC =[]
+                                for x in VMI_AAPList:
+                                    MyStr=x["address_mode"]+","+x["ip"]["ip_prefix"]+"/"+str(x["ip"]["ip_prefix_len"])+"; "
+                                    TMPREC.append(MyStr)
+                                self.UpdateLastRecordValueByKey("AAP",TMPREC)
+                            else:
+                                self.UpdateLastRecordValueByKey("AAP",[])
+
+                        else:
+                            self.UpdateLastRecordValueByKey("AAP",[])
+
+
+                        if "security_group_refs" in CurrentVMIDict.keys():
+                            VMI_SecGroupRefsList = CurrentVMIDict["security_group_refs"]
+                            TMPREC =[]
+                            for x in VMI_SecGroupRefsList:
+                                TMPREC.append(x["to"][2]+";")
+                                self.UpdateLastRecordValueByKey("SecGroups",TMPREC)
+                            else:
+                                self.UpdateLastRecordValueByKey("SecGroups",[])
+
+                        else:
+                            self.UpdateLastRecordValueByKey("SecGroups",[])
+
+                        if "virtual_network_refs" in CurrentVMIDict.keys():
+                            VMI_VNRefsList = CurrentVMIDict["virtual_network_refs"]
+                            TMPREC =[]
+                            VNUUID_List=[]
+                            for x in VMI_VNRefsList:
+                                #TMPREC.append(x["to"][1]+":"+x["to"][2])
+                                VNUUID_List.append(x["uuid"])
+                                TMPREC2=[]
+                                for W in dictarray_object.get_VNs_and_subnets(x["uuid"]):
+                                    NewSubnetData=W[1]+": v"+W[2]+" "+W[3]
+                                    TMPREC2.append(NewSubnetData)
+                                TMPREC.append(x["to"][2]+"("+W[0]+")")
+                                self.UpdateLastRecordValueByKey("Network",TMPREC)
+                                self.UpdateLastRecordValueByKey("Subnet",TMPREC2)
+
+                            else:
+                                self.UpdateLastRecordValueByKey("Network",[])
+
+                        else:
+                            self.UpdateLastRecordValueByKey("Network",[])
+
+
+
+                        if "id_perms" in CurrentVMIDict.keys():
+                            VMI_IDpermissions =CurrentVMIDict["id_perms"]
+                            if "permissions" in VMI_IDpermissions:
+                                VMI_permissions=VMI_IDpermissions["permissions"]
+                                self.UpdateLastRecordValueByKey("Owner",VMI_permissions["owner"])
+                            else:
+                                self.UpdateLastRecordValueByKey("Owner","")
+                        else:
+                            self.UpdateLastRecordValueByKey("Owner","")
+
+
+
+
+
+
+                #       self.NETWORK_LIST = []
+                #       self.SUBNET_LIST = []
+                #       self.VIRTUALPORT_DICT= {}
+
+
+
+
 
