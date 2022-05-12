@@ -68,7 +68,9 @@ def main(arguments):
   
         SRC_VM_REPORTBOX.set_name("report-SRC-"+srcsitename+SRC_VM_REPORTBOX.ReportType)
         SRC_VM_REPORTBOX.produce_vm_report(MyPARAMSDICT,SRC_DA)
+
         SRC_VM_REPORTBOX.calculate_report_total_usage(MyPARAMSDICT)
+
         SRC_VM_REPORTBOX.sort_report(SRC_VM_REPORTBOX.get_sorting_keys())
 
 

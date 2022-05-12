@@ -8,7 +8,7 @@
 
 "ReportsSettings":
     { 
-    "ReportTypesNotToBePrintedOnScreen":[],
+    "ReportTypesNotToBePrintedOnScreen":["SERVICEGRAPH_REPORT"],
     "WrapLinesWhenWritingToFiles":false
     }
     ,
@@ -70,7 +70,7 @@
         "PathForOpenstackFiles" : "./JSON",  
         "PathForOutputReports" : "./REPORTS", 
         "FileTypes" : ["aggregate_list", "hypervisor_list","server_dict", "flavor_list", "volume_list"],
-        "ExtendedFileTypes": ["network_list","subnet_list","virtualport_dict"]
+        "ExtendedFileTypes": ["network_list","subnet_list","port_list"]
     }
 ,   
 "RackOptimizationInputParameters":

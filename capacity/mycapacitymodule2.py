@@ -34,7 +34,6 @@ class vm_report(report):
         # -----------------------------------------------------------------------
         # EXTRACTS FLAVOR PLACEMENT ZONE FROM FLAVOR PROPERTIES RECORD
         # -----------------------------------------------------------------------
-        print(self.__class__)
         def parse_flavor_properties(pars,flavorrecord):
             if "Properties" in flavorrecord.keys():
                 MyFlavorPropertiesDict = flavorrecord["Properties"]
@@ -93,6 +92,7 @@ class vm_report(report):
 
         # PARSE PARAMETER=SERVICE AND RETRIEVE RELEVANT OS PROJECT NAMES
         for PROGETTO in dictarray_object.SERVERDICT:
+
             str_PROGETTO=str(PROGETTO)
             Condition1=str_PROGETTO in pars.paramsdict["SERVICE"] 
             Condition2 ="ALL" in pars.paramsdict["SERVICE"]
@@ -102,17 +102,16 @@ class vm_report(report):
 # TOBE CHANGED as AOP and AOP_Inventory will match if AOP is entered
                 Condition4=True
                 if ServiceName[len(ServiceName)-1]==pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["ServiceNameWildCard"]:
-                    Condition4=str_PROGETTO.find(ServiceName[0:len(ServiceName)-1])>-1
+                    Condition4=str_PROGETTO.find(ServiceName[0:len(ServiceName)-1])>-1 
                 else:
-                    Condition4=str_PROGETTO==ServiceName
+                    Condition4=str_PROGETTO==ServiceName 
 
-                if Condition1 or Condition2 or Condition3 or Condition4:
-                    NEW_SERVICE_ARRAY.append(str_PROGETTO)
+            if Condition1 or Condition2 or Condition3 or Condition4:
+                NEW_SERVICE_ARRAY.append(str_PROGETTO)
         pars.paramsdict["SERVICE"]=NEW_SERVICE_ARRAY
         print("produce_vm_report: parsing the following services: ",NEW_SERVICE_ARRAY)
         if len(NEW_SERVICE_ARRAY)==0:
             pars.cast_error("00202","")
-
 
         for item in [ x for x in dictarray_object.HYPERVISOR_LIST if x["State"] == "up"]:
             nodo = str(item["Hypervisor Hostname"])
@@ -497,10 +496,7 @@ class menu_report(report):
             for SiteFileSuffix in MyList:
                 output.paramsdict[Parname_Of_Sitelist].append(SiteFileSuffix)
             output.paramsdict[parname]=output.paramsdict[Parname_Of_Sitelist][0]            
-            #MySiteSuffixValue=output.paramsdict[parname]
-        #output.paramsdict[parname]=MySiteSuffixValue
-        #output.SRCSITES.append(MySiteSuffixValue)
-        #output.paramsdict[Parname_Of_Sitelist].append(MySiteSuffixValue)
+
         # in order for the services in each site:suffix to be shown, the array of dicts with all the json must be loaded first
         src_da.load_jsons_into_dictarrays(output,parname)
 
@@ -618,10 +614,10 @@ class menu_report(report):
             print(menu.Yellow)
             print(FormatString_AllSpaces.format(' Page '+str(index)+' '))
 
-            self.print_keys_on_top_of_report(params)
+            self.print_report_line(params,self.get_keys(),False)
             for rowindex in range(pagestarts[index], pageends[index]):
                 print(FormatString_AllDots.format(''))
-                self.print_report_line(params,self.Report[rowindex])
+                self.print_report_line(params,self.Report[rowindex], True)
 
             print(FormatString_AllSpaces.format(''))
             RetvalIndex= self.get_keys().index("Suffix")
@@ -1021,8 +1017,20 @@ class rack_report(report):
                 MyRackRecord[ramavail_Rackindex]+=myRecord[ramavail_hwindex]
                 MyRackRecord[vcpuused_Rackindex]+=myRecord[vcpuused_hwindex]
                 MyRackRecord[ramused_Rackindex]+=myRecord[ramused_hwindex]
-                MyRackRecord[PctUsage_Rackindex]=self.calc_max_percentage(myRecord[vcpuused_hwindex],myRecord[vcpuavail_hwindex],myRecord[ramused_hwindex],myRecord[ramavail_hwindex])
                 MyRackRecord[nofcmpts_Rackindex]+=1
+            
+
+        for MyRackRecord in self.Report:
+                #print(MyRackRecord)
+                #print(PctUsage_Rackindex,myRackRecord[vcpuused_Rackindex],myRackRecord[vcpuavail_Rackindex],myRackRecord[ramused_Rackindex],myRackRecord[ramavail_Rackindex],self.calc_max_percentage(myRackRecord[vcpuused_Rackindex],myRackRecord[vcpuavail_Rackindex],myRackRecord[ramused_Rackindex],myRackRecord[ramavail_Rackindex]))
+                Num1 = MyRackRecord[vcpuused_Rackindex] 
+                Den1 = MyRackRecord[vcpuavail_Rackindex]
+                Num2 = MyRackRecord[ramused_Rackindex]
+                Den2 = MyRackRecord[ramavail_Rackindex]
+                MyValue = self.calc_max_percentage(Num1,Den1, Num2,Den2)
+                #print("MyValue={:}".format(MyValue))
+                MyRackRecord[PctUsage_Rackindex]=MyValue
+        #print(self.Report)
 
 
 
@@ -1290,7 +1298,6 @@ class totalresults_report(report):
         # GO THROUGH ALL VMs in SOURCE REPORT ONE BY ONE....
 
         for srcvm in SRC_REPORTBOX.Report:
-
             VM_VCPUS = srcvm[SrcvCPUsUSedPerVMIndex]
             VM_RAM = srcvm[SrcRAMusedMBperVMIndex]
             VM_AZ = srcvm[SrcAZIndex]
@@ -1404,6 +1411,7 @@ class servicegraph_report(report):
     def __init__(self,params):
         super().__init__(params)
         self.ReportType=super().get_reporttype()
+
         self.Report=[]
         self.ReportTotalUsage=[]
         self.color=menu.OKBLUE
@@ -1437,9 +1445,6 @@ class servicegraph_report(report):
         self.ClearData()
         VirtualPortIndex = ReportKeys.index("VirtualPort")
         
-#"SERVICEGRAPH_Keys": ["Project","vnfname","VMname","VirtualPort","PacketMode", "AAP", "Network","Subnet"],
-        #print(servicename)
-        #for PROGETTO in [ Zed for Zed in dictarray_object.SERVERDICT if Zed == servicename]:
         for PROGETTO in [ Zed for Zed in dictarray_object.SERVERDICT if Zed in params.paramsdict["SERVICE"]]:
             print("-- produce_servicegraphreport for "+PROGETTO)
             for VMRecord in dictarray_object.SERVERDICT[PROGETTO]:
@@ -1448,22 +1453,17 @@ class servicegraph_report(report):
                 VMHost= VMRecord["Host"]
                 VMFlavorId=VMRecord["Flavor ID"]
 
-            #for VMReportRecord in [x for x in vm_reportbox.Report if x[ProjectNameIndex]==servicename]:
                 for VirtualMachineInterface in dictarray_object.VIRTUALPORT_DICT["virtual-machine-interfaces"]:
-                    #print(json.dumps(VirtualMachineInterface,indent=22))
-
                     CurrentVMIDict= VirtualMachineInterface["virtual-machine-interface"]
-
                     CurrentVMI_FQDN= CurrentVMIDict["fq_name"]
                     ProjectName =CurrentVMI_FQDN[1]
                     if ProjectName==PROGETTO:
                         self.addemptyrecord()
                         self.UpdateLastRecordValueByKey("VMname",VMName)
                         self.UpdateLastRecordValueByKey("vnfname",self.split_vnfname(VMName,"vnf"))
-
                         self.UpdateLastRecordValueByKey("Project",CurrentVMI_FQDN[1])
-
                         self.UpdateLastRecordValueByKey("VirtualPort",CurrentVMIDict["name"])
+
                         if "virtual_machine_interface_disable_policy" in CurrentVMIDict.keys():
                             VMI_PacketModeAttr = CurrentVMIDict["virtual_machine_interface_disable_policy"]
                         else:
@@ -1471,7 +1471,6 @@ class servicegraph_report(report):
                         self.UpdateLastRecordValueByKey("PacketMode",VMI_PacketModeAttr)
 
                         VMI_VirtualNetworkAttr = CurrentVMIDict["virtual_network_refs"][0]["uuid"]
-
                         VMI_MirrorTo=""
                         if "virtual_machine_interface_properties" in CurrentVMIDict.keys():
                             VMI_IntfPropertiesDict= CurrentVMIDict["virtual_machine_interface_properties"]
@@ -1484,7 +1483,6 @@ class servicegraph_report(report):
                             else:
                                     VMI_MirrorTo="None"
                         self.UpdateLastRecordValueByKey("MirrorTo",VMI_MirrorTo)
-                        
 
                         if "virtual_machine_interface_allowed_address_pairs" in CurrentVMIDict.keys():
                             VMI_AAPDict = CurrentVMIDict["virtual_machine_interface_allowed_address_pairs"]
