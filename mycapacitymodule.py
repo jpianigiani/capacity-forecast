@@ -618,7 +618,7 @@ class report():
     def LineWrapper(self, record):
         var_Keys=self.get_keys()
         Lines=[[]]
-        MaxRows=30
+        MaxRows=128
         Lines=[['' for j in range(len(var_Keys) )] for i in range(MaxRows)]
         MaxRows=0
         try: #CHANGETHIS
@@ -739,29 +739,24 @@ class report():
   # ---------------------------------
     # Print  report Keys header - using Text Wrapping
     # ---------------------------------   
-    def print_keys_on_top_of_report(self,pars):
-        color=self.color
-        var_Keys=self.get_keys()
-        NewLines,Unwrappedline=self.LineWrapper(var_Keys)
-        for myline in NewLines:
-            pars.myprint("{:}".format(color+myline))
-            pars.myprint
-        self.write_line_to_file(color+Unwrappedline)
 
-    def print_report_line(self, pars,record):
+
+    def print_report_line(self, pars,record, applytransforms):
         try:
             color=self.color
 
             NewRecord=[]
             NewLines=[[]]
-            NewRecord=self.Record_ApplyTransforms(record)
+            if applytransforms:
+                NewRecord=self.Record_ApplyTransforms(record)
+            else:
+                NewRecord=record
             NewLines,UnWrappedline=self.LineWrapper(NewRecord)
 
             for myline in NewLines:
                     if self.ReportType not in pars.APPLICATIONCONFIG_DICTIONARY["ReportsSettings"]["ReportTypesNotToBePrintedOnScreen"]:
                         pars.myprint("{:}".format(color+myline))
                         pars.myprint
-            
             self.write_line_to_file("{:s}".format(UnWrappedline))
             return True
         except Exception as err:
@@ -786,13 +781,13 @@ class report():
         self.write_line_to_file(MyLine.format(self.State)+"\n")
 
         #PRINT KEYS HEADER
-        self.print_keys_on_top_of_report(pars)
+        self.print_report_line(pars,self.get_keys(), False)
 
         # PRINT THE REPORT LINE BY LINE
         NewRecord=[]
         reportkeys=self.get_keys()
         for record in self.Report:
-            self.print_report_line(pars,record)
+            self.print_report_line(pars,record,True)
 
         return -1
 

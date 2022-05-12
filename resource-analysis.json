@@ -8,7 +8,7 @@
 
 "ReportsSettings":
     { 
-    "ReportTypesNotToBePrintedOnScreen":[],
+    "ReportTypesNotToBePrintedOnScreen":["SERVICEGRAPH_REPORT"],
     "WrapLinesWhenWritingToFiles":false
     }
     ,
