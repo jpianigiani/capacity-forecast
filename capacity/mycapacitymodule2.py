@@ -148,8 +148,8 @@ class vm_report(report):
 
                         str_VMFLAVORID=str(VM["Flavor ID"])
                         self.UpdateLastRecordValueByKey( "Lineup",self.split_vnfname(VM["Name"],"Lineup"))
-                        self.UpdateLastRecordValueByKey( "vnfname",self.split_vnfname(VM["Name"],"vnf"))
-                        self.UpdateLastRecordValueByKey( "vnfcname",self.split_vnfname(VM["Name"],"vnfc"))
+                        self.UpdateLastRecordValueByKey( "vnfname",self.split_vnfname(VM["Name"],"vnfname"))
+                        self.UpdateLastRecordValueByKey( "vnfcname",self.split_vnfname(VM["Name"],"vnfcname"))
 
                         FOUNDFLAVOR=False
                         Warning=''
@@ -1134,7 +1134,8 @@ class site_report(report):
         SrcvCPUsUSedPerVMIndex =SRCVMReportKeys.index("vCPUsUSedPerVM")
         SrcRAMusedMBperVMIndex = SRCVMReportKeys.index("RAMusedMBperVM")
         SrcProjectperVMIndex = SRCVMReportKeys.index("Project")
-        
+        SrcVMNameIndex = SRCVMReportKeys.index("VMname")
+
         SRCHWReportKeys=SRC_HW_REPORTBOX.get_keys()
         SRC_VCPUsPerCmpIndex=SRCHWReportKeys.index("vCPUsAvailPerHV")
         SRC_RAMPerCmpIndex=SRCHWReportKeys.index("MemoryMBperHV")
@@ -1157,7 +1158,7 @@ class site_report(report):
         RAMAvailPerSite=0
         VCPUUsedPerSite=0
         RAMUsedPerSite=0
-
+        CountOfLineupsPerSite=0
        # "SITE_Report_Keys": ["Site","Project",
        # "NOfVMs","VCPUsUsed", "VCPUsAvail","RAMUsed" ,"RAMAvail","PctUsageOfCmpt"  ],
 
@@ -1169,11 +1170,10 @@ class site_report(report):
 
         for srcvm in SRC_VM_REPORTBOX.Report:
             CurrentVMProject =srcvm[SrcProjectperVMIndex] 
-
             CurrentVMVCPUs=srcvm[SrcvCPUsUSedPerVMIndex]
             CurrentVMRAM=srcvm[SrcRAMusedMBperVMIndex]
-            
 
+            #print(CurrentVMLineup)
             if CurrentVMProject not in ProjectsInSite:
                 ProjectsInSite.append(CurrentVMProject)
                 VMsPerProjectInSite.append(0)
@@ -1203,6 +1203,8 @@ class site_report(report):
                 TotalRAMUsed+=CurrentVMRAM
                 PctUsage[IndexToUpdate]=self.calc_max_percentage( VCPUPerProjectInSite[IndexToUpdate],VCPUAvailPerSite, RAMPerProjectInSite[IndexToUpdate],RAMAvailPerSite)
 
+
+
         ProjectsInSite.append("TOTAL PER SITE")
         VMsPerProjectInSite.append(TotalVMs)
         VCPUPerProjectInSite.append(VCPUUsedPerSite)
@@ -1221,6 +1223,8 @@ class site_report(report):
             self.UpdateLastRecordValueByKey("RAMUsed",RAMPerProjectInSite[Counter])
             self.UpdateLastRecordValueByKey("RAMAvail",RAMInSite[Counter])
             self.UpdateLastRecordValueByKey("PctUsage",PctUsage[Counter])
+            #self.UpdateLastRecordValueByKey("Lineup","")
+
 
 
 
@@ -1339,7 +1343,7 @@ class totalresults_report(report):
                         dstcmp[DstMemoryMBUsedperHVIndex] += VM_RAM
                         #dstcmp.append("{:24s} {:>2d} {:>5s} {:s}".format(VMNAME,VCPUS,dst.mem_show_as_gb(RAM,True),HOSTAGGR[8]))
                         dstcmp[DstNewVMsIndex].append(" {:>10s} ".format(
-                            DST_REPORTBOX.split_vnfname(VM_VMNAME, "vnf-vnfc")))
+                            DST_REPORTBOX.split_vnfname(VM_VMNAME, "vnfname-vnfcname")))
 
                         vmfits = True
    
@@ -1460,7 +1464,7 @@ class servicegraph_report(report):
                     if ProjectName==PROGETTO:
                         self.addemptyrecord()
                         self.UpdateLastRecordValueByKey("VMname",VMName)
-                        self.UpdateLastRecordValueByKey("vnfname",self.split_vnfname(VMName,"vnf"))
+                        self.UpdateLastRecordValueByKey("vnfname",self.split_vnfname(VMName,"vnfname"))
                         self.UpdateLastRecordValueByKey("Project",CurrentVMI_FQDN[1])
                         self.UpdateLastRecordValueByKey("VirtualPort",CurrentVMIDict["name"])
 

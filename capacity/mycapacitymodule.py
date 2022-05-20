@@ -504,10 +504,19 @@ class report():
         self.FIELDLISTS= params.APPLICATIONCONFIG_DICTIONARY["FieldLists"]
         #print(json.dumps(self.APPLICATIONCONFIG_DICTIONARY,indent=22))
         self.FIELDTRANSFORMS=params.APPLICATIONCONFIG_DICTIONARY["FieldTransforms"]
+
+
         self.REPORTFIELDGROUP =params.APPLICATIONCONFIG_DICTIONARY["Reports_Keys"]
         self.RACKOPTPARAMETERS =params.APPLICATIONCONFIG_DICTIONARY["RackOptimizationInputParameters"]
         self.FILESSTRUCTURE =params.APPLICATIONCONFIG_DICTIONARY["Files"]
         self.GenericDict={}
+
+        self.FIELDTRANSFORMSATTRIBUTES=params.APPLICATIONCONFIG_DICTIONARY["FieldTransformsAttributes"]
+        self.myRegexDict= {}
+        for Item in self.FIELDTRANSFORMSATTRIBUTES["split_vnfname"].keys():
+            value = self.FIELDTRANSFORMSATTRIBUTES["split_vnfname"][Item]
+            #print("DEBUG", Item, value)
+            self.myRegexDict[Item]=re.compile(value)        
 
     def get_reporttype(self):
         MyClass= str(self.__class__).replace("<","").replace(">","").replace("'","")
@@ -844,17 +853,33 @@ class report():
     
 
     def split_vnfname(self, vmname, resulttype):
-        if len(vmname) < 23:
-            return " ## "
-            return vmname
+
+
+        Result= self.myRegexDict[resulttype].match(vmname)
+        if Result:
+            #print(vmname,resulttype,Result, "-".join (Result.groups()))
+            return "-".join (Result.groups())
+        else:
+            #print(vmname,resulttype," not found")
+            return "?"*self.FIELDLENGTHS[resulttype]
+            
+
+        if vmnamelen < 23:
+            TempName= vmname.ljust(23," ")
+        else:
+            TempName=vmname
+
         if resulttype == 'vnf':
-            return vmname[12:16]
+            return TempName[12:16]
         if resulttype == 'vnfc':
-            return vmname[18:23]
-        if resulttype == 'Lineup':
-            return vmname[6:9]
+            return TempName[18:23]
+        if resulttype == 'lineup':
+            retval= TempName[6:9]
+            if len(retval)<3:
+                retval="??"
+            return retval
         if resulttype == 'vnf-vnfc':
-            return vmname[12:16]+"-"+vmname[18:23]
+            return TempName[12:16]+"-"+TempName[18:23]
 
     # CONVERTS FILE SUFFIX TO SHORT DATE
     def tstoshortdate(self, x):
