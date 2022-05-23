@@ -65,7 +65,6 @@ class vm_report(report):
                 minidict={}
                 minidict.fromkeys(mykeys)
 
-                #STICAZZI
                 for x in  myvalues:
                     index=myvalues.index(x)
                     minidict[mykeys[index]]=x
@@ -98,8 +97,6 @@ class vm_report(report):
             Condition2 ="ALL" in pars.paramsdict["SERVICE"]
             Condition3 = pars.paramsdict["ANYSERVICE"]==True
             for ServiceName in CopyOfServiceArray:
-
-# TOBE CHANGED as AOP and AOP_Inventory will match if AOP is entered
                 Condition4=True
                 if ServiceName[len(ServiceName)-1]==pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["ServiceNameWildCard"]:
                     Condition4=str_PROGETTO.find(ServiceName[0:len(ServiceName)-1])>-1 
@@ -148,8 +145,8 @@ class vm_report(report):
 
                         str_VMFLAVORID=str(VM["Flavor ID"])
                         self.UpdateLastRecordValueByKey( "Lineup",self.split_vnfname(VM["Name"],"Lineup"))
-                        self.UpdateLastRecordValueByKey( "vnfname",self.split_vnfname(VM["Name"],"vnf"))
-                        self.UpdateLastRecordValueByKey( "vnfcname",self.split_vnfname(VM["Name"],"vnfc"))
+                        self.UpdateLastRecordValueByKey( "vnfname",self.split_vnfname(VM["Name"],"vnfname"))
+                        self.UpdateLastRecordValueByKey( "vnfcname",self.split_vnfname(VM["Name"],"vnfcname"))
 
                         FOUNDFLAVOR=False
                         Warning=''
@@ -1017,8 +1014,20 @@ class rack_report(report):
                 MyRackRecord[ramavail_Rackindex]+=myRecord[ramavail_hwindex]
                 MyRackRecord[vcpuused_Rackindex]+=myRecord[vcpuused_hwindex]
                 MyRackRecord[ramused_Rackindex]+=myRecord[ramused_hwindex]
-                MyRackRecord[PctUsage_Rackindex]=self.calc_max_percentage(myRecord[vcpuused_hwindex],myRecord[vcpuavail_hwindex],myRecord[ramused_hwindex],myRecord[ramavail_hwindex])
                 MyRackRecord[nofcmpts_Rackindex]+=1
+            
+
+        for MyRackRecord in self.Report:
+                #print(MyRackRecord)
+                #print(PctUsage_Rackindex,myRackRecord[vcpuused_Rackindex],myRackRecord[vcpuavail_Rackindex],myRackRecord[ramused_Rackindex],myRackRecord[ramavail_Rackindex],self.calc_max_percentage(myRackRecord[vcpuused_Rackindex],myRackRecord[vcpuavail_Rackindex],myRackRecord[ramused_Rackindex],myRackRecord[ramavail_Rackindex]))
+                Num1 = MyRackRecord[vcpuused_Rackindex] 
+                Den1 = MyRackRecord[vcpuavail_Rackindex]
+                Num2 = MyRackRecord[ramused_Rackindex]
+                Den2 = MyRackRecord[ramavail_Rackindex]
+                MyValue = self.calc_max_percentage(Num1,Den1, Num2,Den2)
+                #print("MyValue={:}".format(MyValue))
+                MyRackRecord[PctUsage_Rackindex]=MyValue
+        #print(self.Report)
 
 
 
@@ -1122,7 +1131,8 @@ class site_report(report):
         SrcvCPUsUSedPerVMIndex =SRCVMReportKeys.index("vCPUsUSedPerVM")
         SrcRAMusedMBperVMIndex = SRCVMReportKeys.index("RAMusedMBperVM")
         SrcProjectperVMIndex = SRCVMReportKeys.index("Project")
-        
+        SrcVMNameIndex = SRCVMReportKeys.index("VMname")
+
         SRCHWReportKeys=SRC_HW_REPORTBOX.get_keys()
         SRC_VCPUsPerCmpIndex=SRCHWReportKeys.index("vCPUsAvailPerHV")
         SRC_RAMPerCmpIndex=SRCHWReportKeys.index("MemoryMBperHV")
@@ -1145,7 +1155,7 @@ class site_report(report):
         RAMAvailPerSite=0
         VCPUUsedPerSite=0
         RAMUsedPerSite=0
-
+        CountOfLineupsPerSite=0
        # "SITE_Report_Keys": ["Site","Project",
        # "NOfVMs","VCPUsUsed", "VCPUsAvail","RAMUsed" ,"RAMAvail","PctUsageOfCmpt"  ],
 
@@ -1157,11 +1167,10 @@ class site_report(report):
 
         for srcvm in SRC_VM_REPORTBOX.Report:
             CurrentVMProject =srcvm[SrcProjectperVMIndex] 
-
             CurrentVMVCPUs=srcvm[SrcvCPUsUSedPerVMIndex]
             CurrentVMRAM=srcvm[SrcRAMusedMBperVMIndex]
-            
 
+            #print(CurrentVMLineup)
             if CurrentVMProject not in ProjectsInSite:
                 ProjectsInSite.append(CurrentVMProject)
                 VMsPerProjectInSite.append(0)
@@ -1191,6 +1200,8 @@ class site_report(report):
                 TotalRAMUsed+=CurrentVMRAM
                 PctUsage[IndexToUpdate]=self.calc_max_percentage( VCPUPerProjectInSite[IndexToUpdate],VCPUAvailPerSite, RAMPerProjectInSite[IndexToUpdate],RAMAvailPerSite)
 
+
+
         ProjectsInSite.append("TOTAL PER SITE")
         VMsPerProjectInSite.append(TotalVMs)
         VCPUPerProjectInSite.append(VCPUUsedPerSite)
@@ -1209,6 +1220,8 @@ class site_report(report):
             self.UpdateLastRecordValueByKey("RAMUsed",RAMPerProjectInSite[Counter])
             self.UpdateLastRecordValueByKey("RAMAvail",RAMInSite[Counter])
             self.UpdateLastRecordValueByKey("PctUsage",PctUsage[Counter])
+            #self.UpdateLastRecordValueByKey("Lineup","")
+
 
 
 
@@ -1327,7 +1340,7 @@ class totalresults_report(report):
                         dstcmp[DstMemoryMBUsedperHVIndex] += VM_RAM
                         #dstcmp.append("{:24s} {:>2d} {:>5s} {:s}".format(VMNAME,VCPUS,dst.mem_show_as_gb(RAM,True),HOSTAGGR[8]))
                         dstcmp[DstNewVMsIndex].append(" {:>10s} ".format(
-                            DST_REPORTBOX.split_vnfname(VM_VMNAME, "vnf-vnfc")))
+                            DST_REPORTBOX.split_vnfname(VM_VMNAME, "vnfname-vnfcname")))
 
                         vmfits = True
    
@@ -1448,7 +1461,7 @@ class servicegraph_report(report):
                     if ProjectName==PROGETTO:
                         self.addemptyrecord()
                         self.UpdateLastRecordValueByKey("VMname",VMName)
-                        self.UpdateLastRecordValueByKey("vnfname",self.split_vnfname(VMName,"vnf"))
+                        self.UpdateLastRecordValueByKey("vnfname",self.split_vnfname(VMName,"vnfname"))
                         self.UpdateLastRecordValueByKey("Project",CurrentVMI_FQDN[1])
                         self.UpdateLastRecordValueByKey("VirtualPort",CurrentVMIDict["name"])
 
