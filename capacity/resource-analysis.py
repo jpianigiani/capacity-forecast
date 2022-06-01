@@ -54,6 +54,8 @@ def main(arguments):
         SRC_HW_REPORTBOX.ClearData()
         SRC_RACK_REPORTBOX.ClearData()
         SRC_SITE_REPORTBOX.ClearData()
+        
+        MyPARAMSDICT.set_service_to_initialvalue()
 
         # SETS THE PARAMETER FOR SOURCE FILES TO CURRENT SOURCE SITE SUFFIX AND LOADS DATA FROM FILES INTO DICTARRAY
         src_paramname="SOURCE_SITE_SUFFIX"

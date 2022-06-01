@@ -198,6 +198,8 @@ class parameters:
                 Retval =False
             return Retval
 
+    def set_service_to_initialvalue(self):
+        self.paramsdict["SERVICE"]=self.paramsdict["INITIALSERVICEVALUE"]
 
     # ----------------------------------------------
     def Parse_Filtered_OS_FileList_BySuffixOrCommandMatch(self,CleanListOfJSONFiles, SuffixParameter):
@@ -850,18 +852,20 @@ class report():
         self.ReportTotalUsage=retval
         return retval
 
-    
+
 
     def split_vnfname(self, vmname, resulttype):
-
-
         Result= self.myRegexDict[resulttype].match(vmname)
         if Result:
             #print(vmname,resulttype,Result, "-".join (Result.groups()))
             return "-".join (Result.groups())
         else:
             #print(vmname,resulttype," not found")
-            return "?"*self.FIELDLENGTHS[resulttype]
+            try:
+                return "?"*self.FIELDLENGTHS[resulttype]
+            except:
+                print("split_vnfname : FIELDLENGTHS does not have field ",resulttype)
+                exit(-1)
             
 
         if vmnamelen < 23:

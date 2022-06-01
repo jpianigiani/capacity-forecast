@@ -27,6 +27,8 @@ class vm_report(report):
         self.REPORT_SORTINGKEYS= super().get_sorting_keys()
 
 
+
+
     # -----------------------------------------------------------------------
     # Transforms dict array into REPORT array 2d - VM level - one line = 1 list = 1 VM 
     # -----------------------------------------------------------------------
@@ -65,7 +67,6 @@ class vm_report(report):
                 minidict={}
                 minidict.fromkeys(mykeys)
 
-                #STICAZZI
                 for x in  myvalues:
                     index=myvalues.index(x)
                     minidict[mykeys[index]]=x
@@ -89,7 +90,11 @@ class vm_report(report):
         minidict={}
         NEW_SERVICE_ARRAY=[]
         CopyOfServiceArray= pars.paramsdict["SERVICE"]
+        #print("DEBUG 1\n\n")
+        #print("SERVICE=",pars.paramsdict["SERVICE"])
+        #print("INITIALSERVICEVALUE=",pars.paramsdict["INITIALSERVICEVALUE"])
 
+        #print("-----------------------------------")
         # PARSE PARAMETER=SERVICE AND RETRIEVE RELEVANT OS PROJECT NAMES
         for PROGETTO in dictarray_object.SERVERDICT:
 
@@ -98,13 +103,14 @@ class vm_report(report):
             Condition2 ="ALL" in pars.paramsdict["SERVICE"]
             Condition3 = pars.paramsdict["ANYSERVICE"]==True
             for ServiceName in CopyOfServiceArray:
-
-# TOBE CHANGED as AOP and AOP_Inventory will match if AOP is entered
                 Condition4=True
-                if ServiceName[len(ServiceName)-1]==pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["ServiceNameWildCard"]:
-                    Condition4=str_PROGETTO.find(ServiceName[0:len(ServiceName)-1])>-1 
+                if len(ServiceName)>0:
+                    if ServiceName[len(ServiceName)-1]==pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["ServiceNameWildCard"]:
+                        Condition4=str_PROGETTO.find(ServiceName[0:len(ServiceName)-1])>-1 
+                    else:
+                        Condition4=str_PROGETTO==ServiceName 
                 else:
-                    Condition4=str_PROGETTO==ServiceName 
+                    Condition4=False
 
             if Condition1 or Condition2 or Condition3 or Condition4:
                 NEW_SERVICE_ARRAY.append(str_PROGETTO)
@@ -476,6 +482,7 @@ class menu_report(report):
         print(json.dumps(output.paramsdict,indent=22))
 
 
+
     def parse_args(self,input,output, src_da, dst_da):
         # ----------------------------------------------
         self.split_cli_args(input,output)
@@ -526,6 +533,8 @@ class menu_report(report):
             src_da.load_jsons_into_dictarrays(output,parname)
             if output.paramsdict["ANYSERVICE"]==False:
                 output.paramsdict["SERVICE"]=self.GetListOfProjectsInSite(output,parname )
+        
+        output.paramsdict["INITIALSERVICEVALUE"]=output.paramsdict["SERVICE"]
 
         output.myprint("------------------ LIST OF PARAMETER ARGUMENTS ---------------------------")	
         output.myprint(json.dumps(output.paramsdict,indent=30))
@@ -981,6 +990,7 @@ class rack_report(report):
         ramused_hwindex=MyHwKeys.index("MemoryMBUsedperHV")
         rack_hwindex=MyHwKeys.index("Rack")
         az_hwindex=MyHwKeys.index("AZ")
+        site_hwindex= MyHwKeys.index("Site")
 
         nofcmpts_Rackindex=MyRackKeys.index("NOfComputes")
         vcpuavail_Rackindex=MyRackKeys.index("VCPUsAvailPerRack")
@@ -995,6 +1005,7 @@ class rack_report(report):
         conta=0
         for myRecord in hwreportbox.Report:
             RackValueFromHWReport = myRecord[rack_hwindex]
+            SiteValueFromHWReport = myRecord[site_hwindex]
             RackFound=False
             MyRackRecord=self.FindRecordByKeyValue("Rack",RackValueFromHWReport)
             
@@ -1002,6 +1013,7 @@ class rack_report(report):
 
             if len(MyRackRecord)==0 :
                 self.addemptyrecord()
+                self.UpdateLastRecordValueByKey("Site",SiteValueFromHWReport)
                 self.UpdateLastRecordValueByKey("Rack",RackValueFromHWReport)
                 self.UpdateLastRecordValueByKey("AZ",myRecord[az_hwindex])
                 self.UpdateLastRecordValueByKey("VCPUsAvailPerRack",myRecord[vcpuavail_hwindex])                
@@ -1260,7 +1272,6 @@ class totalresults_report(report):
                 x.upper().replace("DTNIMS", "DT_NIMS")
             retval = stringa2 in hostaggrlist2
             return retval
-
 
 
         destsitename = pars.parse_suffisso(pars.paramsdict["DESTINATION_SITE_SUFFIX"])

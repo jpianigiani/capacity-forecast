@@ -4,6 +4,7 @@
         "DefaultFlavorProperties":      {"vnf_type":"DT_NIMS_EXT"},
         "ServicesToSkip": ["service", "admin", "tempest", "c_rally", "DeleteMe", "Kashif"],
         "ServiceNameWildCard":"#"
+        
     },
 
 "ReportsSettings":
@@ -12,6 +13,7 @@
     "WrapLinesWhenWritingToFiles":false
     }
     ,
+
 
 "SitesCategories":
     {   
@@ -33,6 +35,7 @@
         "LabMgmtSites": ["nbg992","nbg995"]
     },
     
+
 "Application_Parameters": 
     {
         "TIMESTAMP": "", 
@@ -49,22 +52,16 @@
         "SILENTMODE": false, 
         "HW_OPTIMIZATION_MODE": "", 
         "SKIPMGMTSITE": false,
-        "JUSTSOURCE": true
-    }, 
-    
-"User_CLI_Visible_Parameters": 
-        [ 
-        "SOURCE_SITE_SUFFIX", 
-        "DESTINATION_SITE_SUFFIX", 
-        "SERVICE", 
-        "SERVICEGRAPHENABLED",
-        "WIPE_DESTSITE", 
-        "HW_OPTIMIZATION_MODE", 
-        "SKIPMGMTSITE", 
-        "JUSTSOURCE"
-        ]
-        ,
-        
+        "JUSTSOURCE": true,
+        "INITIALSERVICEVALUE":[]
+    },
+    "User_CLI_Visible_Parameters": 
+    [ 
+    "SOURCE_SITE_SUFFIX", 
+    "DESTINATION_SITE_SUFFIX", 
+    "SERVICE"
+    ]
+    ,
 "Files": 
     {   
         "PathForOpenstackFiles" : "./JSON",  
@@ -73,6 +70,7 @@
         "ExtendedFileTypes": ["network_list","subnet_list","port_list"]
     }
 ,   
+
 "RackOptimizationInputParameters":
     {
         "RacksPerAZ": 2, 
@@ -106,7 +104,7 @@
             ],
         "HW_REPORT_SORTING_KEYS":   ["AZ" , "HypervisorHostname"],
         "RACK_REPORT_KEYS" :
-                                    ["Rack","AZ","NOfComputes","VCPUsUsedPerRack","VCPUsAvailPerRack","RAMUsedperRack","RAMperRack","PctUsageOfRk"],
+                                    ["Site","Rack","AZ","NOfComputes","VCPUsUsedPerRack","VCPUsAvailPerRack","RAMUsedperRack","RAMperRack","PctUsageOfRk"],
         "RACK_REPORT_SORTING_KEYS" :["AZ" , "Rack"],
         "REPORTTOTALS_REPORT_KEYS":["TotalVCPUsPerSite", "TotalRAMPerSite", "%VCPUUsedPerSite", "%RAMUsedPerSite"],
         "REPORTTOTALS_REPORT_SORTING_KEYS":["TotalVCPUs"],
