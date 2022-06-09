@@ -492,7 +492,7 @@ class report():
     def __init__(self,params):
         #super().__init__()
         self.Report = []
-        self.ReportType=0
+        self.ReportType=self.get_reporttype()
         self.State=''
         self.KEYS_KEYNAME="_KEYS"
         self.SORTINGKEYS_KEYNAME="_SORTING_KEYS"
@@ -761,20 +761,17 @@ class report():
                 NewRecord=record
             NewLines,UnWrappedline=self.LineWrapper(NewRecord)
 
+            print_on_screen=self.ReportType not in pars.APPLICATIONCONFIG_DICTIONARY["ReportsSettings"]["ReportTypesNotToBePrintedOnScreen"]
+            wrap_line_on_file=pars.APPLICATIONCONFIG_DICTIONARY["ReportsSettings"]["WrapLinesWhenWritingToFiles"]
+
             for myline in NewLines:
-                    if self.ReportType not in pars.APPLICATIONCONFIG_DICTIONARY["ReportsSettings"]["ReportTypesNotToBePrintedOnScreen"]:
+                    if print_on_screen:
                         pars.myprint("{:}".format(color+myline))
                         pars.myprint
-            self.write_line_to_file("{:s}".format(UnWrappedline))
-            return True
-        except Exception as err:
-            print("ERROR 06 START")
-            traceback.print_exc(limit=None, file=None, chain=True)
-            print("Record: {:}".format(record))
-            print("NewRecord: {:}".format(NewRecord))
-            print("Newlines: {:}".format(NewLines))
-            print("ERROR 06 END")
-            exit(-1)
+                    if wrap_line_on_file:
+                        self.write_line_to_file("{:s}".format(myline))
+            if wrap_line_on_file==False:
+                self.write_line_to_file("{:s}".format(UnWrappedline))
 
     # ---------------------------------
     # Print a report ARRAY (list of lists), line by line  - Includes Text Wrapping
