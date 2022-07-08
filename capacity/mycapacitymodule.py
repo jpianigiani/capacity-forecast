@@ -71,6 +71,7 @@ class parameters:
             self.PATHFOROUTPUTREPORTS=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOutputReports"]
             self.FILETYPES=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["FileTypes"])
             self.EXTENDEDFILETYPES=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["ExtendedFileTypes"])
+            self.EXTENDEDFILETYPES_OPTIONAL=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["ExtendedFileTypes_Optional"])
 
             self.paramsdict = self.APPLICATIONCONFIG_DICTIONARY["Application_Parameters"]
             self.paramslist=list(self.APPLICATIONCONFIG_DICTIONARY["User_CLI_Visible_Parameters"])
@@ -360,7 +361,7 @@ class dictarray:
     VIRTUALPORT_DICT= {}
 
     def __init__(self):
-        self.DICT_ARRAY = []
+        DICT_ARRAY = []
         self.AGGREGATE_LIST = []
         self.HYPERVISOR_LIST = []
         self.SERVERDICT = {}
@@ -371,6 +372,7 @@ class dictarray:
         self.VIRTUALPORT_DICT= {}
         self.VMPERPROJECT={}
         self.SKIPSERVICEGRAPH=False
+        self.HWNUMAAWARE=True
 
     # --------------------------------------------------------------
     # This function loads the json files into the relevant ARRAY of list or dict
@@ -379,7 +381,7 @@ class dictarray:
         # --------------------------------------------------------------
         # Load site data files
         COUNT = 0
-        self.DICT_ARRAY = []
+        DICT_ARRAY = []
         for ITEM in pars.FILETYPES:
             value = pars.paramsdict[paramname]
             FILENAME = pars.PATHFOROPENSTACKFILES + "/" + "openstack_" + ITEM + "_" + value + ".json"
@@ -387,7 +389,7 @@ class dictarray:
             try:
                 with open(FILENAME, 'r') as file1:
                     TMPJSON = json.load(file1)
-                    self.DICT_ARRAY.append(TMPJSON)
+                    DICT_ARRAY.append(TMPJSON)
                     # if  DEBUG>1:
                     #print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
                 COUNT += 1
@@ -396,15 +398,14 @@ class dictarray:
                 pars.cast_error("00004","file:"+FILENAME)
 
 
-        self.AGGREGATE_LIST = self.DICT_ARRAY[0]
-        self.HYPERVISOR_LIST = self.DICT_ARRAY[1]
-        self.SERVERDICT = dict(self.DICT_ARRAY[2])
-        self.FLAVOR_LIST = self.DICT_ARRAY[3]
-        self.VOLUME_LIST = self.DICT_ARRAY[4]
+        self.AGGREGATE_LIST = DICT_ARRAY[0]
+        self.HYPERVISOR_LIST = DICT_ARRAY[1]
+        self.SERVERDICT = dict(DICT_ARRAY[2])
+        self.FLAVOR_LIST = DICT_ARRAY[3]
+        self.VOLUME_LIST = DICT_ARRAY[4]
 
         if pars.paramsdict["SERVICEGRAPHENABLED"]:
-
-            self.DICT_ARRAY = []
+            DICT_ARRAY = []
             for ITEM in pars.EXTENDEDFILETYPES:
                 value = pars.paramsdict[paramname]
                 FILENAME = pars.PATHFOROPENSTACKFILES + "/" + "openstack_" + ITEM + "_" + value + ".json"
@@ -412,7 +413,7 @@ class dictarray:
                 try:
                     with open(FILENAME, 'r') as file1:
                         TMPJSON = json.load(file1)
-                        self.DICT_ARRAY.append(TMPJSON)
+                        DICT_ARRAY.append(TMPJSON)
                         # if  DEBUG>1:
                         #print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
                     COUNT += 1
@@ -424,12 +425,34 @@ class dictarray:
                     pars.cast_error("00013","file:"+FILENAME)
 
             if self.SKIPSERVICEGRAPH==False:
-                self.NETWORK_LIST = self.DICT_ARRAY[0]
-                self.SUBNET_LIST = self.DICT_ARRAY[1]
-                self.VIRTUALPORT_DICT = dict(self.DICT_ARRAY[2])
-                return COUNT
-            else:
-                return 0
+                self.NETWORK_LIST = DICT_ARRAY[0]
+                self.SUBNET_LIST = DICT_ARRAY[1]
+                self.VIRTUALPORT_DICT = dict(DICT_ARRAY[2])
+        
+        if pars.paramsdict["HWNUMAAWARE"]:
+            DICT_ARRAY = []
+            for ITEM in pars.EXTENDEDFILETYPES_OPTIONAL:
+                value = pars.paramsdict[paramname]
+                FILENAME = pars.PATHFOROPENSTACKFILES + "/" + "openstack_" + ITEM + "_" + value + ".json"
+                try:
+                    with open(FILENAME, 'r') as file1:
+                        TMPJSON = json.load(file1)
+                        DICT_ARRAY.append(TMPJSON)
+                        # if  DEBUG>1:
+                        #print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
+                    COUNT += 1
+                except (IOError, EOFError) as e:
+                    self.HWNUMAAWARE=True
+                    MyName=self.__class__
+                    ErrString="{:} skipping Numa Aware HW report ".format(MyName)
+                    print(ErrString)                   
+                    pars.cast_error("00013","file:"+FILENAME)
+
+            if self.HWNUMAAWARE==True:
+                self.HYPERVISOR_VCPU = dict(DICT_ARRAY[0])
+        
+
+            return 0
 
 
 
@@ -476,6 +499,87 @@ class dictarray:
                 "--- DEBUG --- for nodo={:s} agglist={:s}".format(mynodo, appartenenza_nodo))
         return appartenenza_nodo
 
+    def get_vmname(self,vmuuid):
+        VMNAME=""
+        for PROGETTO in self.SERVERDICT:
+            str_PROGETTO=str(PROGETTO)
+
+            for VM in [ x for x in self.SERVERDICT[PROGETTO] if  str(x["ID"])==vmuuid]:
+                                VMNAME=str(VM["Name"])
+
+        if VMNAME=="":
+            print("Error in get_vmname: did not find VM in project: ", str_PROGETTO,"with UUID:",vmuuid)
+            print("DEBUG : get_vmname")
+            
+            VMNAME="!!UNKNOWN!!"
+        return VMNAME
+
+    def site_based_flavor_properties_parser(self, pars, flavorrecord, site_name,vmname, hwcpupolicy):
+        if (site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabTrafficSites"]+
+            pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveTrafficSites"]):
+            Warning= "VM {:} Flavor with hw:cpu_policy=-{:}- in traffic site".format(vmname,hwcpupolicy)
+            if hwcpupolicy!="DEDICATED":
+                print("DEBUG site_based_flavor_properties_parser")
+                #print(json.dumps(flavorrecord,indent=22))
+
+                pars.cast_error("00106",Warning)
+        elif (site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabMgmtSites"]) :
+            Warning= "VM {:} Flavor with hw:cpu_policy ={:} in Lab Mgmt site".format(vmname,hwcpupolicy)
+            if hwcpupolicy!="DEDICATED":
+                pars.cast_error("00107",Warning)
+        elif (site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveMgmtSites"]) :
+            Warning= "VM {:} Flavor with hw:cpu_policy={:} in Live Mgmt site".format(vmname,hwcpupolicy)
+            if hwcpupolicy!="DEDICATED":
+                pars.cast_error("00104",Warning)
+        else:
+            pass
+               
+
+    def parse_flavor_properties(self, pars,flavorrecord):
+        # -----------------------------------------------------------------------
+        # EXTRACTS FLAVOR PLACEMENT ZONE FROM FLAVOR PROPERTIES RECORD
+        # -----------------------------------------------------------------------
+            if "Properties" in flavorrecord.keys():
+                MyFlavorPropertiesDict = flavorrecord["Properties"]
+                if len(MyFlavorPropertiesDict)==0:
+                    retval=pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["DefaultFlavorProperties"]
+                    ErrString="Flavor {:}: missing properties!! Using {:} as HostAgg".format(flavorrecord["Name"],retval)
+                    #pars.cast_error("00101",ErrString)
+                    print(ErrString)
+                    retval={}
+                    return retval
+            else:    
+                ErrString="Flavor {:}: missing properties!! Using EXT as HostAgg, VM CPU UNPINNED".format(flavorrecord["Name"] )
+                pars.cast_error("00101",ErrString)
+                retval=pars.APPLICATIONCONFIGDICTIONARY["DefaulValue"]["DefaultFlavorProperties"]
+                #DT_NIMS_EXT"
+                return retval
+                
+            lista1 = MyFlavorPropertiesDict.split(',')
+            mykeys=[]
+            myvalues=[]
+            try:
+                for x in lista1:
+                    key=x.split("=")[0].strip()
+                    val=x.split("=")[1].strip().replace("'", "")
+                    mykeys.append(str(key))
+                # WARNING - REPLACEMENT OF DTNIMS WITH DT_NIMS since Flavors metadata have Placement zone MISPELLED
+                    myvalues.append(val.upper().replace("DTNIMS","DT_NIMS"))
+                minidict={}
+                minidict.fromkeys(mykeys)
+
+                for x in  myvalues:
+                    index=myvalues.index(x)
+                    minidict[mykeys[index]]=x
+                return minidict
+
+            except:
+                traceback.print_exc(limit=None, file=None, chain=True)
+                ErrString="dictarrays: parse_flavor_properties: {}".format(flavorrecord["Name"])
+                pars.cast_error("00102",ErrString)
+                retval={}
+        
+            return retval
 
 # -------------------------------------------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------------------------------
@@ -751,7 +855,6 @@ class report():
     # Print  report Keys header - using Text Wrapping
     # ---------------------------------   
     def print_report_line(self, pars,record, applytransforms):
-        try:
             color=self.color
             NewRecord=[]
             NewLines=[[]]

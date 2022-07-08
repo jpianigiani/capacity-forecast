@@ -129,14 +129,14 @@
         "00103":
         {
             "Level":"CRITICAL",
-            "Synopsis":"CRITICAL - Flavor ID in VM is not present in Openstack",
+            "Synopsis":"Flavor ID in VM is not present in Openstack",
             "Class":"Openstack Misconfiguration",
             "AfterErrorExecution":[ ]
         },
         "00104":
         {
-            "Level":"CRITICAL",
-            "Synopsis":"Flavor :  hw:cpu_policy NOT set to DEDICATED",
+            "Level":"WARNING",
+            "Synopsis":"Flavor : hw:cpu_policy is not set to DEDICATED in live mgmt site",
             "Class":"Flavor Misconfiguration",
             "AfterErrorExecution":[ ]
         },
@@ -145,6 +145,20 @@
             "Level":"CRITICAL",
             "Synopsis":"Flavor :hw:emulator_threads_policy_share NOT set to SHARE",
             "Class":"Flavor Misconfiguration",
+            "AfterErrorExecution":[ ]
+        },
+        "00106":
+        {
+            "Level":"CRITICAL",
+            "Synopsis":"Flavor:hw:cpu_policy not present:VM CPU unpinned in TRF site",
+            "Class":"Flavor Misconfiguration",
+            "AfterErrorExecution":[ ]
+        },
+        "00107":
+        {
+            "Level":"WARNING",
+            "Synopsis":"Flavor :hw:cpu_policy not present: VM is CPU unpinned in mgmt lab site",
+            "Class":"Overcommittment",
             "AfterErrorExecution":[ ]
         },
         "00201":
@@ -160,6 +174,42 @@
             "Synopsis":"Selector of SERVICES to create VM report results into empty list",
             "Class":"CLI or UI too restrictive selection",
             "AfterErrorExecution":[ "exit(-1)"]
+        },
+        "00302":
+        {
+            "Level":"CRITICAL",
+            "Synopsis":"Pinned VMs use the same VCPU",
+            "Class":"virsh issue",
+            "AfterErrorExecution":[ ]
         }
-     
-}
+        ,
+        "00303":
+        {
+            "Level":"CRITICAL",
+            "Synopsis":"in virsh, VM is assigned CPUs on a WRONG NUMA",
+            "Class":"virsh NUMA Issue",
+            "AfterErrorExecution":[ ]
+        }
+        ,
+        "00304":
+        {
+            "Level":"CRITICAL",
+            "Synopsis":"VM pinned,# of flavor VCPUs!=# of virsh VCPUs",
+            "Class":"virsh NUMA Issue",
+            "AfterErrorExecution":[ ]
+        },
+        "00305":
+        {
+            "Level":"CRITICAL",
+            "Synopsis":"Pinned VM uses vCPUs on multiple NUMAs",
+            "Class":"VM cross NUMA Issue",
+            "AfterErrorExecution":[ ]
+        },
+        "00306":
+        {
+            "Level":"WARNING",
+            "Synopsis":"VM uses vCPUs on multiple NUMAs",
+            "Class":"VM cross NUMA Issue",
+            "AfterErrorExecution":[ ]
+        }
+    }
