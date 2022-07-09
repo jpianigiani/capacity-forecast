@@ -1,3 +1,6 @@
+# Author Jacopo Pianigiani jacopopianigiani@juniper.net
+# Written in 2022
+
 from curses import ERR
 import json
 import string

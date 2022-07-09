@@ -150,7 +150,7 @@
         "TargetHostAggr": 4,
         "NewVMs": 11, 
         "ExistingVMs":99,
-        "VM_names":110,
+        "VM_names":130,
         "VCPUsAvailPerRack": 10, 
         "RAMperRack": 10, 
         "VCPUsUsedPerRack":10, 

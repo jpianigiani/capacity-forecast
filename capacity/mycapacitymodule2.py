@@ -1,3 +1,6 @@
+# Author Jacopo Pianigiani jacopopianigiani@juniper.net
+# Written in 2022
+
 import json
 import string
 import sys
@@ -1586,19 +1589,21 @@ class hw_vcpu_report(report):
             site_name = str(compute["Hypervisor Hostname"].split('.')[1])
             timestamp = SUFFISSO[0:14]
             rack = nomecorto[21:23]
-            print("------------------------------------------------------------------------------------------------------------------------------------------")
-            print("------------------------------------------------------------------------------------------------------------------------------------------")
-            print("DEBUG1 INFO produce_hw_vcpu_report\n")
-            print("DEBUG1 INFO Nodo=:{:} Nodo_longformat={:}".format(nodo,nodo_longformat))
-            #print(dictarray_object.HYPERVISOR_VCPU.keys())
+            if DEBUG==1:
+                print("------------------------------------------------------------------------------------------------------------------------------------------")
+                print("------------------------------------------------------------------------------------------------------------------------------------------")
+                print("DEBUG1 INFO produce_hw_vcpu_report\n")
+                print("DEBUG1 INFO Nodo=:{:} Nodo_longformat={:}".format(nodo,nodo_longformat))
+                #print(dictarray_object.HYPERVISOR_VCPU.keys())
 
             # GET THE RECORD from VIRSH JSON for this compute
             numarecord =dictarray_object.HYPERVISOR_VCPU[nodo]
-            #print("DEBUG2 produce_hw_vcpu_report: Dictionary ")
-            #print(json.dumps(numarecord, indent=22))
-            #print("DEBUG2 end produce_hw_vcpu_report: Dictionary ")
-            print("---------------------------------------------------------------------")
-            print("DEBUG2: INFO -- numarecord['node'].keys():",numarecord["node"].keys())
+            if DEBUG==1:
+                #print("DEBUG2 produce_hw_vcpu_report: Dictionary ")
+                #print(json.dumps(numarecord, indent=22))
+                #print("DEBUG2 end produce_hw_vcpu_report: Dictionary ")
+                print("---------------------------------------------------------------------")
+                print("DEBUG2: INFO -- numarecord['node'].keys():",numarecord["node"].keys())
             
             #For each NUMA in HYPERVISOR, parsing JSON VIRSH...
             for myNUMAidstring in numarecord["node"].keys():
@@ -1607,7 +1612,8 @@ class hw_vcpu_report(report):
 
                 print("---------------------------------------------------------------------")
                 # Get the list of VCPU IDs available for this numa
-                print("DEBUG3 : numa={:}  \n\tmyvCPUperNUMAlist:{:}".format(myNUMAidstring,myvCPUperNUMAlist))
+                if DEBUG==1:
+                    print("DEBUG3 : numa={:}  \n\tmyvCPUperNUMAlist:{:}".format(myNUMAidstring,myvCPUperNUMAlist))
                 myvCPUperNUMAlist=unpackvcpus(clean_dups(myvCPUperNUMAlist))
                 myvCPUperNUMAload=[0] * len(myvCPUperNUMAlist)
                 myNofPinnedVMsperCPU=[0] * len(myvCPUperNUMAlist)
@@ -1626,11 +1632,12 @@ class hw_vcpu_report(report):
 
 
                 if "instances" not in numarecord.keys():
-                    print("---------------------------------------------------------------------")
-                    print("DEBUG4 : WARNING : missing 'instances' key in  ",nodo_longformat)
-                    print("Numa ID:",myNumaId)
-                    print(numarecord.keys())
-                    print("---------------------------------------------------------------------")
+                    if DEBUG==1:
+                        print("---------------------------------------------------------------------")
+                        print("DEBUG4 : WARNING : missing 'instances' key in  ",nodo_longformat)
+                        print("Numa ID:",myNumaId)
+                        print(numarecord.keys())
+                        print("---------------------------------------------------------------------")
 
                 # Scan the instances in the virsh JSON file by ID
                 for myInstance in numarecord["instances"].keys():
@@ -1644,8 +1651,9 @@ class hw_vcpu_report(report):
                         myVMusesList=[]
                         myVMusesList=sorted(unpackvcpus(clean_dups( numarecord["instances"][myInstance]["cpus"])))
                         UseVMUUID=True
-                        print("---------------------------------------------------------------------")
-                        print("DEBUG5: INFO instance {:} in numa {:} vs {:} uses vcpus {:} ".format(myInstance,vm_numaused,myNUMAidstring,myVMusesList))
+                        if DEBUG==1:
+                            print("---------------------------------------------------------------------")
+                            print("DEBUG5: INFO instance {:} in numa {:} vs {:} uses vcpus {:} ".format(myInstance,vm_numaused,myNUMAidstring,myVMusesList))
 
                         for usedvcpu in myVMusesList:
                             if usedvcpu not in myvCPUperNUMAlist:
@@ -1660,13 +1668,15 @@ class hw_vcpu_report(report):
                                 VMNAME=str(VM["Name"])
                                 VMUUID=str(VM["ID"])
                                 VMFLAVORID=VM["Flavor ID"]
-                                print("DEBUG6: INFO Progetto={:} VMNAME={:} FLAVORID={:}".format(str_PROGETTO,VMNAME,VMFLAVORID))
+                                if DEBUG==1:
+                                    print("DEBUG6: INFO Progetto={:} VMNAME={:} FLAVORID={:}".format(str_PROGETTO,VMNAME,VMFLAVORID))
                                 VM_VCPUS=0
                                 VM_IS_CPU_PINNED=False
                                 for FLAVOR in [x for x in dictarray_object.FLAVOR_LIST if x["ID"]==VMFLAVORID]:
                                     VM_VCPUS=FLAVOR["VCPUs"]
                                     minidict= dictarray_object.parse_flavor_properties(pars,FLAVOR)
-                                    print("\tDEBUG7: parsing flavor {:}".format(FLAVOR["ID"]))
+                                    if DEBUG==1:
+                                        print("\tDEBUG7: parsing flavor {:}".format(FLAVOR["ID"]))
                                     if "hw:cpu_policy" in minidict.keys():
                                         if minidict["hw:cpu_policy"].upper()=="DEDICATED":
                                             VM_IS_CPU_PINNED=True
@@ -1674,7 +1684,8 @@ class hw_vcpu_report(report):
                                         mycolor=menu.OKGREEN
                                     else:
                                         mycolor=menu.FAIL
-                                    print(mycolor+"\tDEBUG7: INFO VM IS CPU PINNED={:} ".format(VM_IS_CPU_PINNED))
+                                    if DEBUG==1:
+                                        print(mycolor+"\tDEBUG7: INFO VM IS CPU PINNED={:} ".format(VM_IS_CPU_PINNED))
 
                                 if VM_VCPUS==0:
                                     CountVMsWithoutFlavor+=1
@@ -1689,9 +1700,9 @@ class hw_vcpu_report(report):
                                         AdditionalLoadIndexPerCPU=1
                                     else:
                                         AdditionalLoadIndexPerCPU= round(float(VM_VCPUS)/float(len(myVMusesList)),2)
-                                
-                                print("\tDEBUG8: Additional Load per vCPU={:} ".format(AdditionalLoadIndexPerCPU))
-                                print("\tDEBUG8: Numa {:} Load Before={:}".format(myNUMAidstring,myvCPUperNUMAload))
+                                if DEBUG==1:
+                                    print("\tDEBUG8: Additional Load per vCPU={:} ".format(AdditionalLoadIndexPerCPU))
+                                    print("\tDEBUG8: Numa {:} Load Before={:}".format(myNUMAidstring,myvCPUperNUMAload))
                                 CrossNumaUsage=False
                                 for vcpu in myVMusesList:
                                     if vcpu in myvCPUperNUMAlist:
@@ -1711,8 +1722,9 @@ class hw_vcpu_report(report):
 
                                     else:
                                         CrossNumaUsage=True
-                                print("\tDEBUG8: Numa {:} Load After ={:}".format(myNUMAidstring,myvCPUperNUMAload))
-                                print("\tDEBUG8: Numa {:} Pinn After ={:}".format(myNUMAidstring,myNofPinnedVMsperCPU))
+                                if DEBUG==1:
+                                    print("\tDEBUG8: Numa {:} Load After ={:}".format(myNUMAidstring,myvCPUperNUMAload))
+                                    print("\tDEBUG8: Numa {:} Pinn After ={:}".format(myNUMAidstring,myNofPinnedVMsperCPU))
 
                                 if CrossNumaUsage:
                                         print("---------------------------------------------------------------------")
@@ -1754,7 +1766,7 @@ class hw_vcpu_report(report):
                     self.UpdateLastRecordValueByKey( "HypervisorHostname",nodo_longformat)
                     self.UpdateLastRecordValueByKey( "NUMA_id",myNUMAidstring)
                     self.UpdateLastRecordValueByKey( "vCPUsAvailPerNUMA",len(myvCPUperNUMAlist))
-                    self.UpdateLastRecordValueByKey( "vCPUsUsedPerNUMA",TotalCPULoadPerNUMA)
+                    self.UpdateLastRecordValueByKey( "vCPUsUsedPerNUMA",round(TotalCPULoadPerNUMA,2))
                     self.UpdateLastRecordValueByKey( "vCPU_Load_after",myvCPUperNUMAload[myVCPUindex])
 
                     self.UpdateLastRecordValueByKey( "vCPU_id",myVCPUID)
@@ -1771,8 +1783,8 @@ class hw_vcpu_report(report):
                     #    WarningString+=",".join(myinstances_withcpuonwrongNUMA)+" using vCPUs on wrong numa"
                     #    pars.cast_error("00305",WarningString)
                 
-        print("---------------------------------------------------------------------")
-        print("DEBUG produce_hw_vcpu_report: ")
+        #print("---------------------------------------------------------------------")
+        #print("DEBUG produce_hw_vcpu_report: ")
 
         #self.print_report(pars)
         #exit(-1)

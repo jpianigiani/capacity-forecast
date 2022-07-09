@@ -1,5 +1,7 @@
 
-#from asyncore import file_dispatcher
+# Author Jacopo Pianigiani jacopopianigiani@juniper.net
+# Written in 2022
+
 import json
 import string
 import sys
