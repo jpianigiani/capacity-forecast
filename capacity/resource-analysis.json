@@ -47,7 +47,7 @@
         "SERVICE": [], 
         "ANYSERVICE":false,
         "SERVICEGRAPHENABLED":false,
-        "HWNUMAAWARE":false,
+        "HWNUMAAWARE":true,
         "IGNOREHOSTAGS": false, 
         "WIPE_DESTSITE": false, 
         "BESTVMDISTRO": true, 

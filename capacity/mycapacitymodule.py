@@ -576,14 +576,14 @@ class dictarray:
                 MyFlavorPropertiesDict = flavorrecord["Properties"]
                 if len(MyFlavorPropertiesDict)==0:
                     retval=pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["DefaultFlavorProperties"]
-                    ErrString="Flavor {:}: missing properties!! Using {:} as HostAgg".format(flavorrecord["Name"],retval)
+                    ErrString="flavor {:}: missing properties".format(flavorrecord["Name"])
                     #pars.cast_error("00101",ErrString)
                     #print(ErrString)
                     
-                    retval={}
+                    #retval={}
                     return retval
             else:    
-                ErrString="Flavor {:}: missing properties!! Using EXT as HostAgg, VM CPU UNPINNED".format(flavorrecord["Name"] )
+                ErrString="flavor {:}: missing properties!! Using EXT as HostAgg, VM CPU UNPINNED".format(flavorrecord["Name"] )
                 pars.cast_error("00101",ErrString)
                 retval=pars.APPLICATIONCONFIGDICTIONARY["DefaulValue"]["DefaultFlavorProperties"]
                 #DT_NIMS_EXT"
@@ -871,7 +871,7 @@ class report():
                 #traceback.print_exc(limit=None, file=None, chain=True)
                 print("######################################")
                 print("Record_ApplyTransforms: ERROR 04 START - \nMost likely FIELD is a list but it is not present in the application config JSON in the FIELDSLIST, so it is not classified neither list nor else\n")
-                print("transform=",transform)
+                print("transform function =",transform)
                 print("column:",columnname)
                 print("Field to apply is: {:} of type {:} and value {:}".format(key,mytype,value))
                 print("Record: {:} , current field index {:}\n".format(record,row_itemnumber))
@@ -1022,12 +1022,12 @@ class report():
         except:
             return "??"
     
-    def show_as_percentage(self,myvalue , len):
+    def show_as_percentage(self,myvalue , len,multiplier=1):
 #    def show_as_percentage(self,numerator, denominator, len):
             #value_num=int(numerator)
             #value_den=int(denominator)
             #myvalue= int(100*value_num/value_den)
-            returnval = "{:>3s}".format(str(myvalue)+"%")
+            returnval = "{:>3s}".format(str(myvalue*multiplier)+"%")
             return returnval.rjust(len)
 
     # REMOVES DT_NIMS from AZ/hostaggs

@@ -1584,7 +1584,8 @@ class hw_vcpu_report(report):
             timestamp = SUFFISSO[0:14]
             rack = nomecorto[21:23]
             if DEBUG==1:
-                print("------------------------------------------------------------------------------------------------------------------------------------------")
+                mycolor=menu.Yellow
+                print(menu.Yellow+"------------------------------------------------------------------------------------------------------------------------------------------")
                 print("------------------------------------------------------------------------------------------------------------------------------------------")
                 print("DEBUG1 INFO produce_hw_vcpu_report\n")
                 print("DEBUG1 INFO Nodo=:{:} Nodo_longformat={:}".format(nodo,nodo_longformat))
@@ -1596,7 +1597,7 @@ class hw_vcpu_report(report):
                 #print("DEBUG2 produce_hw_vcpu_report: Dictionary ")
                 #print(json.dumps(numarecord, indent=22))
                 #print("DEBUG2 end produce_hw_vcpu_report: Dictionary ")
-                print("---------------------------------------------------------------------")
+                print(menu.Yellow+"---------------------------------------------------------------------")
                 print("DEBUG2: INFO -- numarecord['node'].keys():",numarecord["node"].keys())
             
             #For each NUMA in HYPERVISOR, parsing JSON VIRSH...
@@ -1604,15 +1605,15 @@ class hw_vcpu_report(report):
                 myNumaId=int(myNUMAidstring)
                 myvCPUperNUMAlist=numarecord["node"][myNUMAidstring]["cpus"]
 
-                print("---------------------------------------------------------------------")
+                print(menu.Yellow+"---------------------------------------------------------------------")
                 # Get the list of VCPU IDs available for this numa
                 if DEBUG==1:
-                    print("DEBUG3 : numa={:}  \n\tmyvCPUperNUMAlist:{:}".format(myNUMAidstring,myvCPUperNUMAlist))
+                    print(menu.Yellow+"DEBUG3 : numa={:} -- {:}vcpus  \tmyvCPUperNUMAlist:{:}".format(myNUMAidstring,len(myvCPUperNUMAlist),myvCPUperNUMAlist))
                 myvCPUperNUMAlist=unpackvcpus(clean_dups(myvCPUperNUMAlist))
                 myvCPUperNUMAload=[0] * len(myvCPUperNUMAlist)
                 myNofPinnedVMsperCPU=[0] * len(myvCPUperNUMAlist)
 
-                myVMusesList=[]
+                vcpus_myVMcanuse=[]
                 myvmcpus_onwrongNUMA=[]
                 myinstances_withcpuonwrongNUMA=[]
                 perNUMAvcpu_listofvms=[]
@@ -1627,7 +1628,7 @@ class hw_vcpu_report(report):
 
                 if "instances" not in numarecord.keys():
                     if DEBUG==1:
-                        print("---------------------------------------------------------------------")
+                        print(menu.Yellow+"---------------------------------------------------------------------")
                         print("DEBUG4 : WARNING : missing 'instances' key in  ",nodo_longformat)
                         print("Numa ID:",myNumaId)
                         print(numarecord.keys())
@@ -1642,14 +1643,17 @@ class hw_vcpu_report(report):
                     if "domuuid" in numarecord["instances"][myInstance].keys() and vm_numaused==myNUMAidstring:
                         VMUUID_virsh=numarecord["instances"][myInstance]["domuuid"]
                         
-                        myVMusesList=[]
-                        myVMusesList=sorted(unpackvcpus(clean_dups( numarecord["instances"][myInstance]["cpus"])))
+                        vcpus_myVMcanuse=[]
+                        vcpus_myVMcanuse=sorted(unpackvcpus(clean_dups( numarecord["instances"][myInstance]["cpus"])))
                         UseVMUUID=True
+                        virsh_NofActuallyUsedvCPUsbyVM=len(numarecord["instances"][myInstance]["cpus"])
                         if DEBUG==1:
-                            print("---------------------------------------------------------------------")
-                            print("DEBUG5: INFO instance {:} in numa {:} vs {:} uses vcpus {:} ".format(myInstance,vm_numaused,myNUMAidstring,myVMusesList))
+                            print(menu.Yellow+"---------------------------------------------------------------------")
+                            print("DEBUG5: INFO instance {:} in numa {:} === {:} can use {:} while only needing {:} and specifically can use \n\tvcpus: {:} ".format(myInstance,
+                                vm_numaused,myNUMAidstring,
+                                len(vcpus_myVMcanuse),virsh_NofActuallyUsedvCPUsbyVM,vcpus_myVMcanuse))
 
-                        for usedvcpu in myVMusesList:
+                        for usedvcpu in vcpus_myVMcanuse:
                             if usedvcpu not in myvCPUperNUMAlist:
                                 myvmcpus_onwrongNUMA.append(usedvcpu)
                                 myinstances_withcpuonwrongNUMA.append(dictarray_object.get_vmname(VMUUID_virsh))
@@ -1663,14 +1667,14 @@ class hw_vcpu_report(report):
                                 VMUUID=str(VM["ID"])
                                 VMFLAVORID=VM["Flavor ID"]
                                 if DEBUG==1:
-                                    print("DEBUG6: INFO Progetto={:} VMNAME={:} FLAVORID={:}".format(str_PROGETTO,VMNAME,VMFLAVORID))
+                                    print("\t"+mycolor+"DEBUG6: INFO Progetto={:} VMNAME={:} FLAVORID={:}".format(str_PROGETTO,VMNAME,VMFLAVORID))
                                 VM_VCPUS=0
                                 VM_IS_CPU_PINNED=False
                                 for FLAVOR in [x for x in dictarray_object.FLAVOR_LIST if x["ID"]==VMFLAVORID]:
                                     VM_VCPUS=FLAVOR["VCPUs"]
                                     minidict= dictarray_object.parse_flavor_properties(pars,FLAVOR)
                                     if DEBUG==1:
-                                        print("\tDEBUG7: parsing flavor {:}".format(FLAVOR["ID"]))
+                                        print(mycolor+"\tDEBUG7: parsing flavor {:}".format(FLAVOR["ID"]))
                                     if "hw:cpu_policy" in minidict.keys():
                                         if minidict["hw:cpu_policy"].upper()=="DEDICATED":
                                             VM_IS_CPU_PINNED=True
@@ -1680,31 +1684,40 @@ class hw_vcpu_report(report):
                                             mycolor=menu.OKGREEN
                                         else:
                                             mycolor=menu.FAIL
-                                        print(mycolor+"\tDEBUG7: INFO VM IS CPU PINNED={:} ".format(VM_IS_CPU_PINNED))
+                                        print(mycolor+"\tDEBUG7: INFO IS VM CPU PINNED={:} ".format(VM_IS_CPU_PINNED))
 
                                 if VM_VCPUS==0:
                                     CountVMsWithoutFlavor+=1
                                     VMswithoutFlavor.append(VMNAME)
                                     AdditionalLoadIndexPerCPU=0
-                                    VMVCPUS=len(numarecord["instances"][myInstance]["cpus"])
+                                    VM_VCPUS=len(numarecord["instances"][myInstance]["cpus"])
+                                    if DEBUG==1:
+                                        print(mycolor+"\t\tDEBUG7B: INFO Corrected VM VCPUS from 0 to ={:} ".format(VM_VCPUS))
+
 
                                 if  VM_VCPUS>0:
                                     if VM_IS_CPU_PINNED:
-                                        if len(myVMusesList)!=VM_VCPUS:
-                                            WarningString="VM:{:} on compute {:} has {:} cpus in flavor, but {:} cpus in virsh".format(VMNAME,compute,VM_VCPUS,len(myVMusesList),)
+                                        if len(vcpus_myVMcanuse)!=VM_VCPUS:
+                                            WarningString=menu.Magenta+"--->>>>>VM:{:} on compute {:} has {:} cpus in flavor, but {:} cpus in virsh".format(VMNAME,compute,VM_VCPUS,len(vcpus_myVMcanuse),)
                                             pars.cast_error("00304",WarningString)
                                             #exit(-1)
-                                        AdditionalLoadIndexPerCPU=1
+                                        AdditionalLoadIndexPerCPU=100
+
                                     else:
-                                        AdditionalLoadIndexPerCPU= round(float(VM_VCPUS)/float(len(myVMusesList)),2)
+                                        if virsh_NofActuallyUsedvCPUsbyVM!=VM_VCPUS:
+                                            WarningString=menu.Magenta+"--->>>>>VM:{:} on compute {:} has {:} cpus in flavor, but {:} cpus in virsh".format(VMNAME,compute,VM_VCPUS,len(vcpus_myVMcanuse),)
+                                            pars.cast_error("00304",WarningString)
+                                            AdditionalLoadIndexPerCPU= int(100*VM_VCPUS/len(vcpus_myVMcanuse))
+                                        else:
+                                            AdditionalLoadIndexPerCPU= int(100*VM_VCPUS/len(vcpus_myVMcanuse))
                                 else:
-                                    pass
+                                    AdditionalLoadIndexPerCPU=0
                                     
                                 if DEBUG==1:
-                                    print("\tDEBUG8: Additional Load per vCPU={:} ".format(AdditionalLoadIndexPerCPU))
-                                    print("\tDEBUG8: Numa {:} Load Before={:}".format(myNUMAidstring,myvCPUperNUMAload))
+                                    print("\tDEBUG8: Numa {:}                    Load Before={:} ".format(myNUMAidstring,myvCPUperNUMAload))
+                                    print("\tDEBUG8: Additional Load per vCPU (total of {:})={:} ".format(len(myvCPUperNUMAlist),AdditionalLoadIndexPerCPU))
                                 CrossNumaUsage=False
-                                for vcpu in myVMusesList:
+                                for vcpu in vcpus_myVMcanuse:
                                     if vcpu in myvCPUperNUMAlist:
                                         VCPU_per_numa_index=myvCPUperNUMAlist.index(vcpu)
                                         oldvalue=myvCPUperNUMAload[VCPU_per_numa_index]
@@ -1722,6 +1735,7 @@ class hw_vcpu_report(report):
 
                                     else:
                                         CrossNumaUsage=True
+
                                 if DEBUG==1:
                                     print("\tDEBUG8: Numa {:} Load After ={:}".format(myNUMAidstring,myvCPUperNUMAload))
                                     print("\tDEBUG8: Numa {:} Pinn After ={:}".format(myNUMAidstring,myNofPinnedVMsperCPU))
@@ -1729,7 +1743,7 @@ class hw_vcpu_report(report):
                                 if CrossNumaUsage:
                                         print("---------------------------------------------------------------------")
                                         ErrString="ERROR instance {:} with VMName = {:} , IS_CPUPINNED={:}  uses :".format(myInstance,VMNAME,VM_IS_CPU_PINNED)
-                                        ErrString+=("\tvcpu {:}  as per VMUsesList {:} ".format(vcpu,myVMusesList))
+                                        ErrString+=("\tvcpu {:}  as per VMUsesList {:} ".format(vcpu,vcpus_myVMcanuse))
                                         ErrString+="\tnot existing in numa VCPUs for compute  {:}, numa  {:}, NUMA CPU list={:} ".format(nodo, myNUMAidstring,myvCPUperNUMAlist)
                                         if VM_IS_CPU_PINNED:
                                             pars.cast_error("00305", ErrString)
@@ -1745,7 +1759,7 @@ class hw_vcpu_report(report):
                 cast_pinned_overlap=False
 
                 for myVCPUindex in range(len(myvCPUperNUMAlist)):
-                    TotalCPULoadPerNUMA+=round(myvCPUperNUMAload[myVCPUindex],2)
+                    TotalCPULoadPerNUMA+=myvCPUperNUMAload[myVCPUindex]
                     if myNofPinnedVMsperCPU[myVCPUindex]>1:
                         WarningString+="vCPU "+str(myVCPUID)+" used by "+str(len(myvCPUperNUMA_vms[myVCPUindex]))+" VMs"
                         ErrString=",".join(myvCPUperNUMA_vms[myVCPUindex]) +" using same vCPUs "+str(myVCPUID)+" on NUMA "+myNUMAidstring
@@ -1766,7 +1780,7 @@ class hw_vcpu_report(report):
                     self.UpdateLastRecordValueByKey( "HypervisorHostname",nodo_longformat)
                     self.UpdateLastRecordValueByKey( "NUMA_id",myNUMAidstring)
                     self.UpdateLastRecordValueByKey( "vCPUsAvailPerNUMA",len(myvCPUperNUMAlist))
-                    self.UpdateLastRecordValueByKey( "vCPUsUsedPerNUMA",round(TotalCPULoadPerNUMA,2))
+                    self.UpdateLastRecordValueByKey( "vCPUsUsedPerNUMA",TotalCPULoadPerNUMA)
                     self.UpdateLastRecordValueByKey( "vCPU_Load_after",myvCPUperNUMAload[myVCPUindex])
 
                     self.UpdateLastRecordValueByKey( "vCPU_id",myVCPUID)
