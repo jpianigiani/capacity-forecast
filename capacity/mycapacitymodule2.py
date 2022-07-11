@@ -1577,7 +1577,7 @@ class hw_vcpu_report(report):
         # Scan each compute from the OPENSTACK JSON List
         for compute in [ x for x in dictarray_object.HYPERVISOR_LIST if x["State"] == "up"]:
             nodo_longformat = str(compute["Hypervisor Hostname"])
-            nodo=nodo_longformat.split(".")[0]
+            nodo=nodo_longformat #.split(".")[0]
             
             nomecorto = str(compute["Hypervisor Hostname"].split('.')[0])
             site_name = str(compute["Hypervisor Hostname"].split('.')[1])
