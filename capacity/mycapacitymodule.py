@@ -14,6 +14,8 @@ import operator
 from datetime import datetime
 import traceback
 
+from aop_logger import aop_logger
+
 
 DEBUG = 0
 
@@ -30,6 +32,8 @@ class parameters:
     PATHFORAPPLICATIONCONFIGDATA='./'
     CONFIGFILE = 'resource-analysis.json'
     ERRORFILE = 'resource-analysis-errors.json'
+    SYSLOGFILE = 'resource-analysis.log'
+
     APPLICATIONCONFIG_DICTIONARY={}
     MODE_OF_OPT_OPS = 0
     paramsdict={}
@@ -59,7 +63,8 @@ class parameters:
         self.ScreenWitdh = int(screencolumns)
         self.ColorsList =(menu.OKBLUE,menu.OKCYAN,menu.OKGREEN,menu.WARNING,menu.FAIL,menu.White,menu.Yellow,menu.Magenta,menu.Grey) 
         self.ERROR_REPORT=[]
-
+        
+        #-------------------------------------------------------------------------------------------------------------------
         try:
 
             with open(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE,'r') as ConfigFile:
@@ -70,28 +75,50 @@ class parameters:
                     print(" CRITICAL! : object class PARAMETERS, __init__ found JSON syntax error in  {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
                     exit(-1)
             self.APPLICATIONCONFIG_DICTIONARY=dict(TMPJSON)
+        #-------------------------------------------------------------------------------------------------------------------
             self.PATHFOROPENSTACKFILES=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOpenstackFiles"]
             self.PATHFOROUTPUTREPORTS=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOutputReports"]
+        #-------------------------------------------------------------------------------------------------------------------
+
+        #-------------------------------------------------------------------------------------------------------------------
             self.FILETYPES=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["FileTypes"])
             self.EXTENDEDFILETYPES=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["ExtendedFileTypes"])
             self.EXTENDEDFILETYPES_OPTIONAL=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["ExtendedFileTypes_Optional"])
+        #-------------------------------------------------------------------------------------------------------------------
 
             self.paramsdict = self.APPLICATIONCONFIG_DICTIONARY["Application_Parameters"]
             self.paramslist=list(self.APPLICATIONCONFIG_DICTIONARY["User_CLI_Visible_Parameters"])
-            self.OUTPUTFILENAME=self.PATHFOROUTPUTREPORTS+'/capacity-forecast.results'
-            self.MYGLOBALFILE = open(self.OUTPUTFILENAME, 'w')
             self.metricformulas=self.APPLICATIONCONFIG_DICTIONARY["RackOptimizationInputParameters"]["MetricFormulasForRackOptimization"]
+        #-------------------------------------------------------------------------------------------------------------------
+        
         except:
             traceback.print_exc(limit=None, file=None, chain=True)
+            #-------------------------------------------------------------------------------------------------------------------
+            print("#-------------------------------------------------------------------------------------------------------------------")
             print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application configuration file {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
+            print("\t Files {:} and  {:} must be , from thedirectory as python main executable, as follows: {:}".format(self.CONFIGFILE, self.ERRORFILE,self.PATHFORAPPLICATIONCONFIGDATA))
+            print("#-------------------------------------------------------------------------------------------------------------------")
             exit(-1)
+        #-------------------------------------------------------------------------------------------------------------------
         try:
             with open(self.PATHFORAPPLICATIONCONFIGDATA+self.ERRORFILE,'r') as ConfigFile:
                 self.ERROR_DICTIONARY = json.load(ConfigFile)
         except:
             traceback.print_exc(limit=None, file=None, chain=True)
-            print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application error data file {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.ERRORFILE))
+            print("#-------------------------------------------------------------------------------------------------------------------")
+            print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application configuration file {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
+            print("\t Files {:} and  {:} must be , from thedirectory as python main executable, as follows: {:}".format(self.CONFIGFILE, self.ERRORFILE,self.PATHFORAPPLICATIONCONFIGDATA))
+            print("#-------------------------------------------------------------------------------------------------------------------")
             exit(-1)
+        #-------------------------------------------------------------------------------------------------------------------
+        mysyslog=aop_logger(3,self.SYSLOGFILE)
+        myloghandler=mysyslog.syslog_handler(
+                address= (self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Target"],
+                self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Port"]))
+        self.logger=mysyslog.logger
+        #-------------------------------------------------------------------------------------------------------------------
+
+
 
     def set(self, key, value):
         self.paramsdict[key] = value
@@ -103,18 +130,9 @@ class parameters:
     def is_silentmode(self):
         return self.paramsdict["SILENTMODE"]
     # -----------------------------------
-    # PRINT to tty or FILE
-    def myprint(self, value):
-        if value is None:
-            return
-        if type(value) != str:
-                print(str(value))
-        else:
-                print(value)
-
     def get_param_value(self, name):
         return self.paramsdict[name]
-
+    # -----------------------------------
     def get_azoptimization_mode(self):
     # NO_OPTIMIZATION = 0
     # OPTIMIZE_BY_CALC = 1
@@ -127,11 +145,11 @@ class parameters:
             else:
                 MODE_OF_OPT_OPS = self.OPTIMIZE_BY_FILE
         return MODE_OF_OPT_OPS
-
+    # -----------------------------------
     def show_cli_command(self):
         MyLine = menu.OKGREEN+'{0:_^'+str(self.ScreenWitdh)+'}'
-        self.myprint(MyLine.format('LIST OF PARAMETER ARGUMENTS'))
-        self.myprint(json.dumps(self.paramsdict,indent=40))
+        print(MyLine.format('LIST OF PARAMETER ARGUMENTS'))
+        print(json.dumps(self.paramsdict,indent=40))
         # PRINT CLI COMMAND AND PARAMETERS USED
         CMD = "python3 resource-analysis.py"
         for x in self.paramsdict:
@@ -149,7 +167,7 @@ class parameters:
         CMD2 = CMD.replace("[", "")
         CMD3 = CMD2.replace("]", "")
         CMD4 = CMD3.replace(", ", ",")
-        self.myprint(CMD4)
+        print(CMD4)
         return True
         
     def SuffixToShortDate(self,suffix):
@@ -194,6 +212,7 @@ class parameters:
             if category not in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["Categories"]:
                 ErrString= "Category passed to IsItWhatSite is not in application config data list :"+category
                 self.cast_error("00011",ErrString)
+
             if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][category]:
                 Retval=True
             if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][category]:
@@ -335,7 +354,18 @@ class parameters:
             NEWRECORD.append(ErrorInfo["Synopsis"])
             NEWRECORD.append(AddlData)
             #NEWRECORD.append(ErrorInfo)
+            syslogstring="Timestamp: {:9s} Site: {:12s} ErrCode: {:5s} Class:{:30s} Synopsis:{:60s}: {:120s}".format(SrcSuffix[0:8],
+                            SiteName,ErrorCode,ErrorObjectClass,ErrorInfo["Synopsis"],AddlData)
+            if ErrorInfo["Level"]=="CRITICAL":
+                self.logger.critical(syslogstring)
+            elif ErrorInfo["Level"]=="ERROR":
+                self.logger.error(syslogstring)
+            elif ErrorInfo["Level"]=="WARNING":
+                self.logger.warning(syslogstring)
+
             self.ERROR_REPORT.append(NEWRECORD)
+        
+        
 
         actions = ErrorInfo["AfterErrorExecution"]
         for Item in actions:
@@ -522,7 +552,7 @@ class dictarray:
             pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveTrafficSites"]):
             Warning= "VM {:} Flavor with hw:cpu_policy=-{:}- in traffic site".format(vmname,hwcpupolicy)
             if hwcpupolicy!="DEDICATED":
-                print("DEBUG site_based_flavor_properties_parser")
+                #print("DEBUG site_based_flavor_properties_parser")
                 #print(json.dumps(flavorrecord,indent=22))
 
                 pars.cast_error("00106",Warning)
@@ -872,8 +902,8 @@ class report():
 
             for myline in NewLines:
                     if print_on_screen:
-                        pars.myprint("{:}".format(color+myline))
-                        pars.myprint
+                        print("{:}".format(color+myline))
+                        print
                     if wrap_line_on_file:
                         self.write_line_to_file("{:s}".format(myline))
             if wrap_line_on_file==False:
@@ -886,9 +916,9 @@ class report():
         # REPORT HEADER
         color=self.color
         MyLine = color+'{0:_^'+str(pars.ScreenWitdh)+'}'
-        pars.myprint(MyLine.format(self.name))
+        print(MyLine.format(self.name))
         self.write_line_to_file(MyLine.format(self.name)+"\n")
-        pars.myprint(MyLine.format(self.State))
+        print(MyLine.format(self.State))
         self.write_line_to_file(MyLine.format(self.State)+"\n")
 
         #PRINT KEYS HEADER
@@ -971,22 +1001,6 @@ class report():
                 exit(-1)
             
 
-        if vmnamelen < 23:
-            TempName= vmname.ljust(23," ")
-        else:
-            TempName=vmname
-
-        if resulttype == 'vnf':
-            return TempName[12:16]
-        if resulttype == 'vnfc':
-            return TempName[18:23]
-        if resulttype == 'lineup':
-            retval= TempName[6:9]
-            if len(retval)<3:
-                retval="??"
-            return retval
-        if resulttype == 'vnf-vnfc':
-            return TempName[12:16]+"-"+TempName[18:23]
 
     # CONVERTS FILE SUFFIX TO SHORT DATE
     def tstoshortdate(self, x):

@@ -1,4 +1,5 @@
 {
+"syslog":{"Target":"","Port":"514"},
 "DefaultValues":
     {
         "DefaultFlavorProperties":      {"vnf_type":"DT_NIMS_EXT"},
@@ -46,7 +47,7 @@
         "SERVICE": [], 
         "ANYSERVICE":false,
         "SERVICEGRAPHENABLED":false,
-        "HWNUMAAWARE":true,
+        "HWNUMAAWARE":false,
         "IGNOREHOSTAGS": false, 
         "WIPE_DESTSITE": false, 
         "BESTVMDISTRO": true, 

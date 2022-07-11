@@ -345,7 +345,7 @@ class menu_report(report):
 
         os.system("clear")
         stringalinea1 = '{0:_^'+str(self.ScreenWitdh)+'}'
-        params.myprint(stringalinea1.format( " SERVICES AVAILABLE IN SITE "+params.paramsdict[parname]))
+        params.print(stringalinea1.format( " SERVICES AVAILABLE IN SITE "+params.paramsdict[parname]))
         results = []
         for Item in self.load_svcs_by_prefix(params,params.paramsdict[parname]):
             TMPREC=[]
@@ -359,7 +359,7 @@ class menu_report(report):
         index = 0        
         for Item in sortedres:
             Item[0]=index
-            params.myprint("\n\t{:} --- {:30s} --- ({:4d})".format(index, Item[1],Item[2]))
+            params.print("\n\t{:} --- {:30s} --- ({:4d})".format(index, Item[1],Item[2]))
             index+=1
         #print(sortedres)
         src=""
@@ -490,8 +490,8 @@ class menu_report(report):
         
         output.paramsdict["INITIALSERVICEVALUE"]=output.paramsdict["SERVICE"]
 
-        output.myprint("------------------ LIST OF PARAMETER ARGUMENTS ---------------------------")	
-        output.myprint(json.dumps(output.paramsdict,indent=30))
+        print("------------------ LIST OF PARAMETER ARGUMENTS ---------------------------")	
+        print(json.dumps(output.paramsdict,indent=30))
 
         return 1
         # MERGE WITH 
@@ -772,7 +772,7 @@ class hw_report(report):
         stringalinea1 = '{0:_^'+str(pars.ScreenWitdh)+'}'
 
         #Initialize and produce RACK REPORT . Initialize report for optimixzation results
-        pars.myprint (stringalinea1.format(menu.Yellow+SUFFISSO+"  initial layout "+str(SUFFISSO)))
+        print (stringalinea1.format(menu.Yellow+SUFFISSO+"  initial layout "+str(SUFFISSO)))
         MyRackReport.Report=[]
         MyRackReport.Rack_Opt_Memory={ "rackslayout":[],"azcpus":[],"sigma2":math.inf, "metric_formula":''}
         MyRackReport.Rack_Opt_Memory["metric_formula"]=metric_formula
@@ -786,8 +786,8 @@ class hw_report(report):
 
         CurrentMetricValue = Calculate_UsageSymmetry_ofLoadPerAZ(LoadValuesPerRack,metric_formula)
         MyRackReport.Rack_Opt_Memory["sigma2"]=CurrentMetricValue
-        pars.myprint("\tCurrent Metric Value: {:.2f}".format(CurrentMetricValue))
-        pars.myprint (stringalinea1.format(menu.Yellow))
+        print("\tCurrent Metric Value: {:.2f}".format(CurrentMetricValue))
+        print (stringalinea1.format(menu.Yellow))
         racks=MyRackReport.get_column_by_key("Rack")
 
         UsageLoadForCurrentRackToAZPerm=[]
@@ -811,7 +811,7 @@ class hw_report(report):
             total = total*i
         
         #Init line
-        pars.myprint (stringalinea1.format("\n"+menu.FAIL+ pars.parse_suffisso(SUFFISSO)+menu.Yellow+" -->  brute force scan on rack pairs to optimize AZ resource distribution, based on metric : "+metric_formula+menu.Yellow+" "))
+        print (stringalinea1.format("\n"+menu.FAIL+ pars.parse_suffisso(SUFFISSO)+menu.Yellow+" -->  brute force scan on rack pairs to optimize AZ resource distribution, based on metric : "+metric_formula+menu.Yellow+" "))
 
         sys.stdout.write('\t|')
         sys.stdout.flush()
@@ -857,17 +857,17 @@ class hw_report(report):
 
         try:
 
-            pars.myprint(stringalinea1.format("\n"+menu.Yellow+ " OPTIMIZATION RESULTS "+menu.Yellow))
-            pars.myprint("\nOPTIMIZATION OF RACKS DISTRIBUTION TO AZ: FINAL RACK LAYOUT:\n")
-            pars.myprint("\tTOTAL MATCHING LAYOUTS ="+str(matches))
-            pars.myprint("\tOPTIMIZED RACK LAYOUT:")
-            pars.myprint(MyRackReport.Rack_Opt_Memory["rackslayout"])
-            pars.myprint("\tDISTRIBUTION OF VCPUS:")
-            pars.myprint(MyRackReport.Rack_Opt_Memory["azcpus"])
+            print(stringalinea1.format("\n"+menu.Yellow+ " OPTIMIZATION RESULTS "+menu.Yellow))
+            print("\nOPTIMIZATION OF RACKS DISTRIBUTION TO AZ: FINAL RACK LAYOUT:\n")
+            print("\tTOTAL MATCHING LAYOUTS ="+str(matches))
+            print("\tOPTIMIZED RACK LAYOUT:")
+            print(MyRackReport.Rack_Opt_Memory["rackslayout"])
+            print("\tDISTRIBUTION OF VCPUS:")
+            print(MyRackReport.Rack_Opt_Memory["azcpus"])
             MyRackReport.OUTPUTDICT[pars.parse_suffisso(SUFFISSO)]=MyRackReport.Rack_Opt_Memory
             MyRackReport.writeoptimizedrackstofile(pars)
-            pars.myprint("\n\t\tREALIGNING RACKS TO AZ IN ACCORDANCE TO RACK-TO-AZ NEW MAP\n \t\tRACK TO AZ MAP={} METRIC={} SIGMA={}".format(MyRackReport.Rack_Opt_Memory["rackslayout"],metric_formula,MyRackReport.Rack_Opt_Memory["sigma2"]))
-            pars.myprint (stringalinea1.format(menu.Yellow))
+            print("\n\t\tREALIGNING RACKS TO AZ IN ACCORDANCE TO RACK-TO-AZ NEW MAP\n \t\tRACK TO AZ MAP={} METRIC={} SIGMA={}".format(MyRackReport.Rack_Opt_Memory["rackslayout"],metric_formula,MyRackReport.Rack_Opt_Memory["sigma2"]))
+            print (stringalinea1.format(menu.Yellow))
 
             returnarray.append(MyRackReport.Rack_Opt_Memory["rackslayout"])
             retval=self.after_opt_realign_racks_to_optimizedAZdistro_inHWReport(MyRackReport)
@@ -1025,7 +1025,7 @@ class rack_report(report):
             FILENAME=pars.PATHFOROUTPUTREPORTS+'/HW_OPTIMIZATION_MODE_targetracklayout_'+pars.paramsdict["HW_OPTIMIZATION_MODE"]+".json"
             with open(FILENAME,'r') as file1:
                 HW_OPTIMIZATION_MODE=json.load(file1)
-                pars.myprint( json.dumps(HW_OPTIMIZATION_MODE, indent=22))
+                print( json.dumps(HW_OPTIMIZATION_MODE, indent=22))
         except (IOError,EOFError) as e:
             print(" ERROR - file {:s} not found for Rack to AZ realignment".format(pars.paramsdict["HW_OPTIMIZATION_MODE"]))
             exit(1)
@@ -1064,10 +1064,10 @@ class rack_report(report):
         memorydict=self.OUTPUTDICT
         suffix=pars.paramsdict["DESTINATION_SITE_SUFFIX"]
         if len(memorydict)==0:
-            pars.myprint("WARNING writeoptimizedrackstofile: no data in optimized rack layout dict: skipping appending data to {} ".format(FILENAME))
+            print("WARNING writeoptimizedrackstofile: no data in optimized rack layout dict: skipping appending data to {} ".format(FILENAME))
             return False
         sitename=pars.parse_suffisso(suffix)
-        pars.myprint(json.dumps(memorydict,indent=22))
+        print(json.dumps(memorydict,indent=22))
         with open(FILENAME,'w') as file1:
             json.dump(memorydict,file1)
             file1.close
@@ -1521,13 +1521,6 @@ class servicegraph_report(report):
 
 
 
-                #       self.NETWORK_LIST = []
-                #       self.SUBNET_LIST = []
-                #       self.VIRTUALPORT_DICT= {}
-
-
-
-
 class hw_vcpu_report(report):
     def __init__(self,params):
         super().__init__(params)
@@ -1585,6 +1578,7 @@ class hw_vcpu_report(report):
         for compute in [ x for x in dictarray_object.HYPERVISOR_LIST if x["State"] == "up"]:
             nodo_longformat = str(compute["Hypervisor Hostname"])
             nodo=nodo_longformat.split(".")[0]
+            
             nomecorto = str(compute["Hypervisor Hostname"].split('.')[0])
             site_name = str(compute["Hypervisor Hostname"].split('.')[1])
             timestamp = SUFFISSO[0:14]
@@ -1680,18 +1674,21 @@ class hw_vcpu_report(report):
                                     if "hw:cpu_policy" in minidict.keys():
                                         if minidict["hw:cpu_policy"].upper()=="DEDICATED":
                                             VM_IS_CPU_PINNED=True
-                                    if VM_IS_CPU_PINNED:
-                                        mycolor=menu.OKGREEN
-                                    else:
-                                        mycolor=menu.FAIL
+                                    
                                     if DEBUG==1:
+                                        if VM_IS_CPU_PINNED:
+                                            mycolor=menu.OKGREEN
+                                        else:
+                                            mycolor=menu.FAIL
                                         print(mycolor+"\tDEBUG7: INFO VM IS CPU PINNED={:} ".format(VM_IS_CPU_PINNED))
 
                                 if VM_VCPUS==0:
                                     CountVMsWithoutFlavor+=1
                                     VMswithoutFlavor.append(VMNAME)
                                     AdditionalLoadIndexPerCPU=0
-                                else:
+                                    VMVCPUS=len(numarecord["instances"][myInstance]["cpus"])
+
+                                if  VM_VCPUS>0:
                                     if VM_IS_CPU_PINNED:
                                         if len(myVMusesList)!=VM_VCPUS:
                                             WarningString="VM:{:} on compute {:} has {:} cpus in flavor, but {:} cpus in virsh".format(VMNAME,compute,VM_VCPUS,len(myVMusesList),)
@@ -1700,6 +1697,8 @@ class hw_vcpu_report(report):
                                         AdditionalLoadIndexPerCPU=1
                                     else:
                                         AdditionalLoadIndexPerCPU= round(float(VM_VCPUS)/float(len(myVMusesList)),2)
+                                else:
+                                    
                                 if DEBUG==1:
                                     print("\tDEBUG8: Additional Load per vCPU={:} ".format(AdditionalLoadIndexPerCPU))
                                     print("\tDEBUG8: Numa {:} Load Before={:}".format(myNUMAidstring,myvCPUperNUMAload))

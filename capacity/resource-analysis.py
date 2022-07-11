@@ -11,10 +11,11 @@ import itertools
 import math
 import operator
 from datetime import datetime
+
 from mycapacitymodule import *
 from mycapacitymodule2 import *
-
-
+from aop_logger import *
+#import resource_analysis 
 
 DEBUG=0
 
@@ -30,8 +31,6 @@ def main(arguments):
     SRC_DA= dictarray()
     DST_DA= dictarray()
     ERROR_REPORTBOX = error_report(MyPARAMSDICT)
-
-
     SRC_VM_REPORTBOX = vm_report(MyPARAMSDICT)
     SRC_HW_REPORTBOX = hw_report(MyPARAMSDICT)
     DST_HW_REPORTBOX = hw_report(MyPARAMSDICT)
