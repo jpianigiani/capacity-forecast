@@ -1,3 +1,6 @@
+# Author Jacopo Pianigiani jacopopianigiani@juniper.net
+# Written in 2022
+
 from curses import ERR
 import json
 import string
@@ -10,6 +13,8 @@ import re
 import operator
 from datetime import datetime
 import traceback
+
+from aop_logger import aop_logger
 
 
 DEBUG = 0
@@ -27,6 +32,8 @@ class parameters:
     PATHFORAPPLICATIONCONFIGDATA='./'
     CONFIGFILE = 'resource-analysis.json'
     ERRORFILE = 'resource-analysis-errors.json'
+    SYSLOGFILE = 'resource-analysis.log'
+
     APPLICATIONCONFIG_DICTIONARY={}
     MODE_OF_OPT_OPS = 0
     paramsdict={}
@@ -56,7 +63,8 @@ class parameters:
         self.ScreenWitdh = int(screencolumns)
         self.ColorsList =(menu.OKBLUE,menu.OKCYAN,menu.OKGREEN,menu.WARNING,menu.FAIL,menu.White,menu.Yellow,menu.Magenta,menu.Grey) 
         self.ERROR_REPORT=[]
-
+        
+        #-------------------------------------------------------------------------------------------------------------------
         try:
 
             with open(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE,'r') as ConfigFile:
@@ -67,27 +75,50 @@ class parameters:
                     print(" CRITICAL! : object class PARAMETERS, __init__ found JSON syntax error in  {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
                     exit(-1)
             self.APPLICATIONCONFIG_DICTIONARY=dict(TMPJSON)
+        #-------------------------------------------------------------------------------------------------------------------
             self.PATHFOROPENSTACKFILES=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOpenstackFiles"]
             self.PATHFOROUTPUTREPORTS=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOutputReports"]
+        #-------------------------------------------------------------------------------------------------------------------
+
+        #-------------------------------------------------------------------------------------------------------------------
             self.FILETYPES=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["FileTypes"])
             self.EXTENDEDFILETYPES=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["ExtendedFileTypes"])
+            self.EXTENDEDFILETYPES_OPTIONAL=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["ExtendedFileTypes_Optional"])
+        #-------------------------------------------------------------------------------------------------------------------
 
             self.paramsdict = self.APPLICATIONCONFIG_DICTIONARY["Application_Parameters"]
             self.paramslist=list(self.APPLICATIONCONFIG_DICTIONARY["User_CLI_Visible_Parameters"])
-            self.OUTPUTFILENAME=self.PATHFOROUTPUTREPORTS+'/capacity-forecast.results'
-            self.MYGLOBALFILE = open(self.OUTPUTFILENAME, 'w')
             self.metricformulas=self.APPLICATIONCONFIG_DICTIONARY["RackOptimizationInputParameters"]["MetricFormulasForRackOptimization"]
+        #-------------------------------------------------------------------------------------------------------------------
+        
         except:
             traceback.print_exc(limit=None, file=None, chain=True)
+            #-------------------------------------------------------------------------------------------------------------------
+            print("#-------------------------------------------------------------------------------------------------------------------")
             print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application configuration file {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
+            print("\t Files {:} and  {:} must be , from thedirectory as python main executable, as follows: {:}".format(self.CONFIGFILE, self.ERRORFILE,self.PATHFORAPPLICATIONCONFIGDATA))
+            print("#-------------------------------------------------------------------------------------------------------------------")
             exit(-1)
+        #-------------------------------------------------------------------------------------------------------------------
         try:
             with open(self.PATHFORAPPLICATIONCONFIGDATA+self.ERRORFILE,'r') as ConfigFile:
                 self.ERROR_DICTIONARY = json.load(ConfigFile)
         except:
             traceback.print_exc(limit=None, file=None, chain=True)
-            print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application error data file {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.ERRORFILE))
+            print("#-------------------------------------------------------------------------------------------------------------------")
+            print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application configuration file {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
+            print("\t Files {:} and  {:} must be , from thedirectory as python main executable, as follows: {:}".format(self.CONFIGFILE, self.ERRORFILE,self.PATHFORAPPLICATIONCONFIGDATA))
+            print("#-------------------------------------------------------------------------------------------------------------------")
             exit(-1)
+        #-------------------------------------------------------------------------------------------------------------------
+        mysyslog=aop_logger(3,self.SYSLOGFILE)
+        myloghandler=mysyslog.syslog_handler(
+                address= (self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Target"],
+                self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Port"]))
+        self.logger=mysyslog.logger
+        #-------------------------------------------------------------------------------------------------------------------
+
+
 
     def set(self, key, value):
         self.paramsdict[key] = value
@@ -99,18 +130,9 @@ class parameters:
     def is_silentmode(self):
         return self.paramsdict["SILENTMODE"]
     # -----------------------------------
-    # PRINT to tty or FILE
-    def myprint(self, value):
-        if value is None:
-            return
-        if type(value) != str:
-                print(str(value))
-        else:
-                print(value)
-
     def get_param_value(self, name):
         return self.paramsdict[name]
-
+    # -----------------------------------
     def get_azoptimization_mode(self):
     # NO_OPTIMIZATION = 0
     # OPTIMIZE_BY_CALC = 1
@@ -123,11 +145,11 @@ class parameters:
             else:
                 MODE_OF_OPT_OPS = self.OPTIMIZE_BY_FILE
         return MODE_OF_OPT_OPS
-
+    # -----------------------------------
     def show_cli_command(self):
         MyLine = menu.OKGREEN+'{0:_^'+str(self.ScreenWitdh)+'}'
-        self.myprint(MyLine.format('LIST OF PARAMETER ARGUMENTS'))
-        self.myprint(json.dumps(self.paramsdict,indent=40))
+        print(MyLine.format('LIST OF PARAMETER ARGUMENTS'))
+        print(json.dumps(self.paramsdict,indent=40))
         # PRINT CLI COMMAND AND PARAMETERS USED
         CMD = "python3 resource-analysis.py"
         for x in self.paramsdict:
@@ -145,7 +167,7 @@ class parameters:
         CMD2 = CMD.replace("[", "")
         CMD3 = CMD2.replace("]", "")
         CMD4 = CMD3.replace(", ", ",")
-        self.myprint(CMD4)
+        print(CMD4)
         return True
         
     def SuffixToShortDate(self,suffix):
@@ -190,6 +212,7 @@ class parameters:
             if category not in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["Categories"]:
                 ErrString= "Category passed to IsItWhatSite is not in application config data list :"+category
                 self.cast_error("00011",ErrString)
+
             if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][category]:
                 Retval=True
             if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][category]:
@@ -331,7 +354,18 @@ class parameters:
             NEWRECORD.append(ErrorInfo["Synopsis"])
             NEWRECORD.append(AddlData)
             #NEWRECORD.append(ErrorInfo)
+            syslogstring="Timestamp: {:9s} Site: {:12s} ErrCode: {:5s} Class:{:30s} Synopsis:{:60s}: {:120s}".format(SrcSuffix[0:8],
+                            SiteName,ErrorCode,ErrorObjectClass,ErrorInfo["Synopsis"],AddlData)
+            if ErrorInfo["Level"]=="CRITICAL":
+                self.logger.critical(syslogstring)
+            elif ErrorInfo["Level"]=="ERROR":
+                self.logger.error(syslogstring)
+            elif ErrorInfo["Level"]=="WARNING":
+                self.logger.warning(syslogstring)
+
             self.ERROR_REPORT.append(NEWRECORD)
+        
+        
 
         actions = ErrorInfo["AfterErrorExecution"]
         for Item in actions:
@@ -360,7 +394,7 @@ class dictarray:
     VIRTUALPORT_DICT= {}
 
     def __init__(self):
-        self.DICT_ARRAY = []
+        DICT_ARRAY = []
         self.AGGREGATE_LIST = []
         self.HYPERVISOR_LIST = []
         self.SERVERDICT = {}
@@ -371,6 +405,7 @@ class dictarray:
         self.VIRTUALPORT_DICT= {}
         self.VMPERPROJECT={}
         self.SKIPSERVICEGRAPH=False
+        self.HWNUMAAWARE=True
 
     # --------------------------------------------------------------
     # This function loads the json files into the relevant ARRAY of list or dict
@@ -379,7 +414,7 @@ class dictarray:
         # --------------------------------------------------------------
         # Load site data files
         COUNT = 0
-        self.DICT_ARRAY = []
+        DICT_ARRAY = []
         for ITEM in pars.FILETYPES:
             value = pars.paramsdict[paramname]
             FILENAME = pars.PATHFOROPENSTACKFILES + "/" + "openstack_" + ITEM + "_" + value + ".json"
@@ -387,7 +422,7 @@ class dictarray:
             try:
                 with open(FILENAME, 'r') as file1:
                     TMPJSON = json.load(file1)
-                    self.DICT_ARRAY.append(TMPJSON)
+                    DICT_ARRAY.append(TMPJSON)
                     # if  DEBUG>1:
                     #print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
                 COUNT += 1
@@ -396,15 +431,14 @@ class dictarray:
                 pars.cast_error("00004","file:"+FILENAME)
 
 
-        self.AGGREGATE_LIST = self.DICT_ARRAY[0]
-        self.HYPERVISOR_LIST = self.DICT_ARRAY[1]
-        self.SERVERDICT = dict(self.DICT_ARRAY[2])
-        self.FLAVOR_LIST = self.DICT_ARRAY[3]
-        self.VOLUME_LIST = self.DICT_ARRAY[4]
+        self.AGGREGATE_LIST = DICT_ARRAY[0]
+        self.HYPERVISOR_LIST = DICT_ARRAY[1]
+        self.SERVERDICT = dict(DICT_ARRAY[2])
+        self.FLAVOR_LIST = DICT_ARRAY[3]
+        self.VOLUME_LIST = DICT_ARRAY[4]
 
         if pars.paramsdict["SERVICEGRAPHENABLED"]:
-
-            self.DICT_ARRAY = []
+            DICT_ARRAY = []
             for ITEM in pars.EXTENDEDFILETYPES:
                 value = pars.paramsdict[paramname]
                 FILENAME = pars.PATHFOROPENSTACKFILES + "/" + "openstack_" + ITEM + "_" + value + ".json"
@@ -412,7 +446,7 @@ class dictarray:
                 try:
                     with open(FILENAME, 'r') as file1:
                         TMPJSON = json.load(file1)
-                        self.DICT_ARRAY.append(TMPJSON)
+                        DICT_ARRAY.append(TMPJSON)
                         # if  DEBUG>1:
                         #print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
                     COUNT += 1
@@ -424,12 +458,34 @@ class dictarray:
                     pars.cast_error("00013","file:"+FILENAME)
 
             if self.SKIPSERVICEGRAPH==False:
-                self.NETWORK_LIST = self.DICT_ARRAY[0]
-                self.SUBNET_LIST = self.DICT_ARRAY[1]
-                self.VIRTUALPORT_DICT = dict(self.DICT_ARRAY[2])
-                return COUNT
-            else:
-                return 0
+                self.NETWORK_LIST = DICT_ARRAY[0]
+                self.SUBNET_LIST = DICT_ARRAY[1]
+                self.VIRTUALPORT_DICT = dict(DICT_ARRAY[2])
+        
+        if pars.paramsdict["HWNUMAAWARE"]:
+            DICT_ARRAY = []
+            for ITEM in pars.EXTENDEDFILETYPES_OPTIONAL:
+                value = pars.paramsdict[paramname]
+                FILENAME = pars.PATHFOROPENSTACKFILES + "/" + "openstack_" + ITEM + "_" + value + ".json"
+                try:
+                    with open(FILENAME, 'r') as file1:
+                        TMPJSON = json.load(file1)
+                        DICT_ARRAY.append(TMPJSON)
+                        # if  DEBUG>1:
+                        #print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
+                    COUNT += 1
+                except (IOError, EOFError) as e:
+                    self.HWNUMAAWARE=True
+                    MyName=self.__class__
+                    ErrString="{:} skipping Numa Aware HW report ".format(MyName)
+                    print(ErrString)                   
+                    pars.cast_error("00013","file:"+FILENAME)
+
+            if self.HWNUMAAWARE==True:
+                self.HYPERVISOR_VCPU = dict(DICT_ARRAY[0])
+        
+
+            return 0
 
 
 
@@ -476,6 +532,88 @@ class dictarray:
                 "--- DEBUG --- for nodo={:s} agglist={:s}".format(mynodo, appartenenza_nodo))
         return appartenenza_nodo
 
+    def get_vmname(self,vmuuid):
+        VMNAME=""
+        for PROGETTO in self.SERVERDICT:
+            str_PROGETTO=str(PROGETTO)
+
+            for VM in [ x for x in self.SERVERDICT[PROGETTO] if  str(x["ID"])==vmuuid]:
+                                VMNAME=str(VM["Name"])
+
+        if VMNAME=="":
+            print("Error in get_vmname: did not find VM in project: ", str_PROGETTO,"with UUID:",vmuuid)
+            print("DEBUG : get_vmname")
+            
+            VMNAME="!!UNKNOWN!!"
+        return VMNAME
+
+    def site_based_flavor_properties_parser(self, pars, flavorrecord, site_name,vmname, hwcpupolicy):
+        if (site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabTrafficSites"]+
+            pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveTrafficSites"]):
+            Warning= "VM {:} Flavor with hw:cpu_policy=-{:}- in traffic site".format(vmname,hwcpupolicy)
+            if hwcpupolicy!="DEDICATED":
+                #print("DEBUG site_based_flavor_properties_parser")
+                #print(json.dumps(flavorrecord,indent=22))
+
+                pars.cast_error("00106",Warning)
+        elif (site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabMgmtSites"]) :
+            Warning= "VM {:} Flavor with hw:cpu_policy ={:} in Lab Mgmt site".format(vmname,hwcpupolicy)
+            if hwcpupolicy!="DEDICATED":
+                pars.cast_error("00107",Warning)
+        elif (site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveMgmtSites"]) :
+            Warning= "VM {:} Flavor with hw:cpu_policy={:} in Live Mgmt site".format(vmname,hwcpupolicy)
+            if hwcpupolicy!="DEDICATED":
+                pars.cast_error("00104",Warning)
+        else:
+            pass
+               
+
+    def parse_flavor_properties(self, pars,flavorrecord):
+        # -----------------------------------------------------------------------
+        # EXTRACTS FLAVOR PLACEMENT ZONE FROM FLAVOR PROPERTIES RECORD
+        # -----------------------------------------------------------------------
+            if "Properties" in flavorrecord.keys():
+                MyFlavorPropertiesDict = flavorrecord["Properties"]
+                if len(MyFlavorPropertiesDict)==0:
+                    retval=pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["DefaultFlavorProperties"]
+                    ErrString="flavor {:}: missing properties".format(flavorrecord["Name"])
+                    #pars.cast_error("00101",ErrString)
+                    #print(ErrString)
+                    
+                    #retval={}
+                    return retval
+            else:    
+                ErrString="flavor {:}: missing properties!! Using EXT as HostAgg, VM CPU UNPINNED".format(flavorrecord["Name"] )
+                pars.cast_error("00101",ErrString)
+                retval=pars.APPLICATIONCONFIGDICTIONARY["DefaulValue"]["DefaultFlavorProperties"]
+                #DT_NIMS_EXT"
+                return retval
+                
+            lista1 = MyFlavorPropertiesDict.split(',')
+            mykeys=[]
+            myvalues=[]
+            try:
+                for x in lista1:
+                    key=x.split("=")[0].strip()
+                    val=x.split("=")[1].strip().replace("'", "")
+                    mykeys.append(str(key))
+                # WARNING - REPLACEMENT OF DTNIMS WITH DT_NIMS since Flavors metadata have Placement zone MISPELLED
+                    myvalues.append(val.upper().replace("DTNIMS","DT_NIMS"))
+                minidict={}
+                minidict.fromkeys(mykeys)
+
+                for x in  myvalues:
+                    index=myvalues.index(x)
+                    minidict[mykeys[index]]=x
+                return minidict
+
+            except:
+                traceback.print_exc(limit=None, file=None, chain=True)
+                ErrString="dictarrays: parse_flavor_properties: {}".format(flavorrecord["Name"])
+                pars.cast_error("00102",ErrString)
+                retval={}
+        
+            return retval
 
 # -------------------------------------------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------------------------------
@@ -733,7 +871,7 @@ class report():
                 #traceback.print_exc(limit=None, file=None, chain=True)
                 print("######################################")
                 print("Record_ApplyTransforms: ERROR 04 START - \nMost likely FIELD is a list but it is not present in the application config JSON in the FIELDSLIST, so it is not classified neither list nor else\n")
-                print("transform=",transform)
+                print("transform function =",transform)
                 print("column:",columnname)
                 print("Field to apply is: {:} of type {:} and value {:}".format(key,mytype,value))
                 print("Record: {:} , current field index {:}\n".format(record,row_itemnumber))
@@ -751,7 +889,6 @@ class report():
     # Print  report Keys header - using Text Wrapping
     # ---------------------------------   
     def print_report_line(self, pars,record, applytransforms):
-        try:
             color=self.color
             NewRecord=[]
             NewLines=[[]]
@@ -766,8 +903,8 @@ class report():
 
             for myline in NewLines:
                     if print_on_screen:
-                        pars.myprint("{:}".format(color+myline))
-                        pars.myprint
+                        print("{:}".format(color+myline))
+                        print
                     if wrap_line_on_file:
                         self.write_line_to_file("{:s}".format(myline))
             if wrap_line_on_file==False:
@@ -780,9 +917,9 @@ class report():
         # REPORT HEADER
         color=self.color
         MyLine = color+'{0:_^'+str(pars.ScreenWitdh)+'}'
-        pars.myprint(MyLine.format(self.name))
+        print(MyLine.format(self.name))
         self.write_line_to_file(MyLine.format(self.name)+"\n")
-        pars.myprint(MyLine.format(self.State))
+        print(MyLine.format(self.State))
         self.write_line_to_file(MyLine.format(self.State)+"\n")
 
         #PRINT KEYS HEADER
@@ -865,22 +1002,6 @@ class report():
                 exit(-1)
             
 
-        if vmnamelen < 23:
-            TempName= vmname.ljust(23," ")
-        else:
-            TempName=vmname
-
-        if resulttype == 'vnf':
-            return TempName[12:16]
-        if resulttype == 'vnfc':
-            return TempName[18:23]
-        if resulttype == 'lineup':
-            retval= TempName[6:9]
-            if len(retval)<3:
-                retval="??"
-            return retval
-        if resulttype == 'vnf-vnfc':
-            return TempName[12:16]+"-"+TempName[18:23]
 
     # CONVERTS FILE SUFFIX TO SHORT DATE
     def tstoshortdate(self, x):
@@ -901,12 +1022,12 @@ class report():
         except:
             return "??"
     
-    def show_as_percentage(self,myvalue , len):
+    def show_as_percentage(self,myvalue , len,multiplier=1):
 #    def show_as_percentage(self,numerator, denominator, len):
             #value_num=int(numerator)
             #value_den=int(denominator)
             #myvalue= int(100*value_num/value_den)
-            returnval = "{:>3s}".format(str(myvalue)+"%")
+            returnval = "{:>3s}".format(str(myvalue*multiplier)+"%")
             return returnval.rjust(len)
 
     # REMOVES DT_NIMS from AZ/hostaggs

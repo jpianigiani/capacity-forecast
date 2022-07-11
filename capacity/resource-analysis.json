@@ -1,4 +1,5 @@
 {
+"syslog":{"Target":"","Port":"514"},
 "DefaultValues":
     {
         "DefaultFlavorProperties":      {"vnf_type":"DT_NIMS_EXT"},
@@ -10,7 +11,7 @@
 "ReportsSettings":
     { 
     "ReportTypesNotToBePrintedOnScreen":["SERVICEGRAPH_REPORT"],
-    "WrapLinesWhenWritingToFiles":false
+    "WrapLinesWhenWritingToFiles":true
     }
     ,
 
@@ -45,7 +46,8 @@
         "DESTSITESLIST": [],
         "SERVICE": [], 
         "ANYSERVICE":false,
-        "SERVICEGRAPHENABLED":true,
+        "SERVICEGRAPHENABLED":false,
+        "HWNUMAAWARE":true,
         "IGNOREHOSTAGS": false, 
         "WIPE_DESTSITE": false, 
         "BESTVMDISTRO": true, 
@@ -67,7 +69,8 @@
         "PathForOpenstackFiles" : "./JSON",  
         "PathForOutputReports" : "./REPORTS", 
         "FileTypes" : ["aggregate_list", "hypervisor_list","server_dict", "flavor_list", "volume_list"],
-        "ExtendedFileTypes": ["network_list","subnet_list","port_list"]
+        "ExtendedFileTypes": ["network_list","subnet_list","port_list"],
+        "ExtendedFileTypes_Optional": ["hypervisor_numa"]
     }
 ,   
 
@@ -115,7 +118,10 @@
         "ERROR_REPORT_KEYS": ["TimeStamp","SourceSite","ErrLevel","Class","ErrorCode","Synopsis","Description" ],
         "ERROR_REPORT_SORTING_KEYS": ["TimeStamp","SourceSite","ErrLevel","ErrorCode"],
         "SERVICEGRAPH_REPORT_KEYS": ["Project","vnfname","VMname","VirtualPort","PacketMode", "AAP", "Network","Subnet","SecGroups","Owner","MirrorTo"],
-        "SERVICEGRAPH_REPORT_SORTING_KEYS":["Project","vnfname","VMname", "Network"]
+        "SERVICEGRAPH_REPORT_SORTING_KEYS":["Project","vnfname","VMname", "Network"],
+        "HW_VCPU_REPORT_KEYS":["TimeStamp", "Site", "AZ", "Rack", "HypervisorHostname", "NUMA_id","vCPUsAvailPerNUMA","vCPUsUsedPerNUMA","vCPU_id", "vCPU_Load_after","NOfVMs","NofPinnedVMs","VM_names","Warning"],
+        "HW_VCPU_REPORT_SORTING_KEYS":["Site", "AZ", "Rack", "HypervisorHostname", "vCPU_id"]
+
 
     },
 "FieldLenghts":
@@ -124,9 +130,12 @@
         "Site": 6, 
         "SiteType":16,
         "Rack": 4, 
-        "HypervisorHostname": 8, 
+        "HypervisorHostname": 8,
+        "NUMA_id":2, 
         "vCPUsAvailPerHV": 4, 
-        "vCPUsUsedPerHV": 4, 
+        "vCPUsUsedPerHV": 4,
+        "vCPUsAvailPerNUMA": 4, 
+        "vCPUsUsedPerNUMA": 4, 
         "MemoryMBperHV": 7,
         "MemoryMBUsedperHV": 7, 
         "TotalUsageIndex": 5,
@@ -142,6 +151,7 @@
         "TargetHostAggr": 4,
         "NewVMs": 11, 
         "ExistingVMs":99,
+        "VM_names":130,
         "VCPUsAvailPerRack": 10, 
         "RAMperRack": 10, 
         "VCPUsUsedPerRack":10, 
@@ -160,12 +170,14 @@
         "Service": 20, 
         "Outcome": 60, 
         "vCPU_Load_after": 6 ,
+        "vCPU_id" : 3,
         "Item": 4, 
         "Date": 10, 
         "Suffix": 20, 
         "Projects": 150, 
         "Warning": 20,
         "NOfVMs": 6,
+        "NofPinnedVMs":6,
         "VCPUsUsed":10, 
         "RAMUsed" :10,
         "VCPUsAvail":10, 
@@ -193,7 +205,8 @@
         "HostAggr":1, "NewVMs":10, "ExistingVMs":10, 
         "Projects":30,"Service":20,
         "AAP":20,"Network":20, 
-        "Subnet":40,"SecGroups":20
+        "Subnet":40,"SecGroups":20, 
+        "VM_names":26
     }
     ,
     
