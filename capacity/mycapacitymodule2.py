@@ -1698,6 +1698,7 @@ class hw_vcpu_report(report):
                                     else:
                                         AdditionalLoadIndexPerCPU= round(float(VM_VCPUS)/float(len(myVMusesList)),2)
                                 else:
+                                    pass
                                     
                                 if DEBUG==1:
                                     print("\tDEBUG8: Additional Load per vCPU={:} ".format(AdditionalLoadIndexPerCPU))

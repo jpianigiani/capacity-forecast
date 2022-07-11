@@ -578,7 +578,8 @@ class dictarray:
                     retval=pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["DefaultFlavorProperties"]
                     ErrString="Flavor {:}: missing properties!! Using {:} as HostAgg".format(flavorrecord["Name"],retval)
                     #pars.cast_error("00101",ErrString)
-                    print(ErrString)
+                    #print(ErrString)
+                    
                     retval={}
                     return retval
             else:    
