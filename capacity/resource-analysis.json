@@ -11,7 +11,7 @@
 "ReportsSettings":
     { 
     "ReportTypesNotToBePrintedOnScreen":["SERVICEGRAPH_REPORT"],
-    "WrapLinesWhenWritingToFiles":true
+    "WrapLinesWhenWritingToFiles":false
     }
     ,
 
@@ -55,6 +55,7 @@
         "HW_OPTIMIZATION_MODE": "", 
         "SKIPMGMTSITE": false,
         "JUSTSOURCE": true,
+        "DEBUG":0,
         "INITIALSERVICEVALUE":[]
     },
     "User_CLI_Visible_Parameters": 
