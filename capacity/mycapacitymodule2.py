@@ -1652,8 +1652,8 @@ class hw_vcpu_report(report):
 
                 #Creates TWO empty arrays with as many records as VCPUs for this NUMA,
                 # #These will store the load of each VCPU (100= fully used vCPU) and the number of VMs using each VCPU 
-                myvCPUperNUMAload=[0.0] * len(myvCPUperNUMAlist)
-                myNofPinnedVMsperCPU=[0.0] * len(myvCPUperNUMAlist)
+                myvCPUperNUMAload=[0.0 for _ in range( len(myvCPUperNUMAlist))]
+                myNofPinnedVMsperCPU=[0.0 for _ in range(len(myvCPUperNUMAlist))]
 
                 vcpus_myVMcanuse=[]
                 myvmcpus_onwrongNUMA=[]
@@ -1797,14 +1797,14 @@ class hw_vcpu_report(report):
                                         oldvalue=myvCPUperNUMAload[VCPU_per_numa_index]
                                         newvalue=oldvalue+AdditionalLoadIndexPerCPU
                                         myvCPUperNUMAload[VCPU_per_numa_index]=newvalue
-                                        if pars.DEBUG==1:
+                                        if pars.DEBUG>=2:
                                             print("\tDEBUG71 : Numa {:}  vCPU id= {:} index={:} , myvCPUperNUMA_vms={:}".format(myNUMAidstring,vcpu,VCPU_per_numa_index, myvCPUperNUMA_vms))     
                                             print("\tDEBUG72 :myvCPUperNUMA_vms[VCPU_per_numa_index]=".format(myvCPUperNUMA_vms[VCPU_per_numa_index]))
                                         if VMNAME not in myvCPUperNUMA_vms[VCPU_per_numa_index] :
                                             myvCPUperNUMA_vms[VCPU_per_numa_index].append(VMNAME)
-                                            if pars.DEBUG==1:
+                                            if pars.DEBUG>=2:
                                                 print("\tDEBUG73 : added {:} to index {:} of myvCPUperNUMA_vms".format(VMNAME,VCPU_per_numa_index))
-                                        if pars.DEBUG==1:
+                                        if pars.DEBUG>=2:
                                             print("\tDEBUG74 : Numa {:}  vCPU id= {:} index={:} , myvCPUperNUMA_vms={:}".format(myNUMAidstring,vcpu,VCPU_per_numa_index, myvCPUperNUMA_vms))     
 
                                 
@@ -1844,7 +1844,7 @@ class hw_vcpu_report(report):
 # myNofPinnedVMsperCPU = list of pinned VMs on each VCPU for this compute:NUMA
 # myvCPUperNUMAload = Load for each vCPU on this compute:NUMA
 
-                if pars.DEBUG==1:
+                if pars.DEBUG>=2:
                     print("\t\t\tDEBUG 10......................")
 
                 # For each VCPU in this NUMA
@@ -1861,7 +1861,7 @@ class hw_vcpu_report(report):
                 for myVCPUindex in range(len(myvCPUperNUMAlist)):
                     myVCPUID=myvCPUperNUMAlist[myVCPUindex]
                     myVMsusingthisvCPU=myvCPUperNUMA_vms[myVCPUindex]
-                    if pars.DEBUG==1:
+                    if pars.DEBUG>=2:
                         print("\t\t\t\t DEBUG 11......................")
                         print("\t\t\t\t myVCPUindex {:} vCPUID={:} VMs using it are:{:}......................".format(myVCPUindex,myVCPUID,",".join(myVMsusingthisvCPU)))
 

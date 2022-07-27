@@ -55,7 +55,7 @@
         "HW_OPTIMIZATION_MODE": "", 
         "SKIPMGMTSITE": false,
         "JUSTSOURCE": true,
-        "DEBUG":0,
+        "DEBUG":1,
         "INITIALSERVICEVALUE":[]
     },
     "User_CLI_Visible_Parameters": 
