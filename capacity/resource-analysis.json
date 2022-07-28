@@ -55,7 +55,7 @@
         "HW_OPTIMIZATION_MODE": "", 
         "SKIPMGMTSITE": false,
         "JUSTSOURCE": true,
-        "DEBUG":1,
+        "DEBUG":0,
         "INITIALSERVICEVALUE":[]
     },
     "User_CLI_Visible_Parameters": 
@@ -120,7 +120,7 @@
         "ERROR_REPORT_SORTING_KEYS": ["TimeStamp","SourceSite","ErrLevel","ErrorCode"],
         "SERVICEGRAPH_REPORT_KEYS": ["Project","vnfname","VMname","VirtualPort","PacketMode", "AAP", "Network","Subnet","SecGroups","Owner","MirrorTo"],
         "SERVICEGRAPH_REPORT_SORTING_KEYS":["Project","vnfname","VMname", "Network"],
-        "HW_VCPU_REPORT_KEYS":["TimeStamp", "Site", "AZ", "Rack", "HypervisorHostname", "NUMA_id","vCPUsAvailPerNUMA","vCPUsUsedPerNUMA","vCPU_id", "vCPU_Load_after","NOfVMs","NofPinnedVMs","VM_names","Warning"],
+        "HW_VCPU_REPORT_KEYS":["TimeStamp", "Site", "AZ", "Rack", "HypervisorHostname", "NUMA_id","vCPUsAvailPerNUMA","vCPUsUsedPerNUMA","vCPU_id", "vCPU_Load_after","NOfVMs","NofPinnedVMs","VM_names","NUMA_Warning"],
         "HW_VCPU_REPORT_SORTING_KEYS":["Site", "AZ", "Rack", "HypervisorHostname", "vCPU_id"]
 
 
@@ -152,7 +152,7 @@
         "TargetHostAggr": 4,
         "NewVMs": 11, 
         "ExistingVMs":99,
-        "VM_names":130,
+        "VM_names":52,
         "VCPUsAvailPerRack": 10, 
         "RAMperRack": 10, 
         "VCPUsUsedPerRack":10, 
@@ -177,6 +177,7 @@
         "Suffix": 20, 
         "Projects": 150, 
         "Warning": 20,
+        "NUMA_Warning":130,
         "NOfVMs": 6,
         "NofPinnedVMs":6,
         "VCPUsUsed":10, 
@@ -189,7 +190,7 @@
         "ErrLevel":9,
         "ErrorCode":5,
         "Synopsis":60,
-        "Description":90,
+        "Description":130,
         "ErrorInfo":40,
         "VirtualPort": 70,
         "PacketMode": 6,
@@ -250,6 +251,7 @@
         "VCPUsAvail":"value.rjust(length)",
         "NOfVMs": "value.rjust(length)",
         "AAP":"self.shortenAAP(value).ljust(length)",
+        "vCPU_Load_after":"self.show_as_percentage(value,length)",
         "default": "value.rjust(length)"
     } ,
 "FieldTransformsAttributes":

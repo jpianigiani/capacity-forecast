@@ -67,13 +67,13 @@ def main(arguments):
         del SRC_DA
         SRC_DA=dictarray()
         SRC_DA.load_jsons_into_dictarrays(MyPARAMSDICT, src_paramname)
-
         # CREATE OBJECTS FOR EACH REPORT FOR SOURCE SITE: VM, HW, RACK, SITE; FINALREPORT IS CREATED ONLY IF DEST SITE USED
         FINAL_REPORTBOX.set_name("TOTALRESULTS-"+srcsitename)
   
         SRC_VM_REPORTBOX.set_name("SRC-"+srcsitename+SRC_VM_REPORTBOX.ReportType)
         SRC_VM_REPORTBOX.produce_vm_report(MyPARAMSDICT,SRC_DA)
         SRC_VM_REPORTBOX.calculate_report_total_usage(MyPARAMSDICT)
+
         SRC_VM_REPORTBOX.sort_report(SRC_VM_REPORTBOX.get_sorting_keys())
 
         SRC_HW_REPORTBOX.set_name("SRC-"+srcsitename+SRC_HW_REPORTBOX.ReportType)
@@ -85,6 +85,7 @@ def main(arguments):
         SRC_RACK_REPORTBOX.produce_rack_report(MyPARAMSDICT,SRC_HW_REPORTBOX)
         SRC_RACK_REPORTBOX.sort_report(SRC_RACK_REPORTBOX.get_sorting_keys())
 
+
         SRC_SITE_REPORTBOX.set_name("SRC-"+srcsitename+SRC_SITE_REPORTBOX.ReportType)
         SRC_SITE_REPORTBOX.produce_site_report(MyPARAMSDICT,SRC_VM_REPORTBOX,SRC_HW_REPORTBOX)
         SRC_SITE_REPORTBOX.sort_report(SRC_SITE_REPORTBOX.get_sorting_keys())
@@ -92,7 +93,7 @@ def main(arguments):
         SRC_HWNUMA_REPORTBOX.set_name("SRC-"+srcsitename+SRC_HWNUMA_REPORTBOX.ReportType)
         SRC_HWNUMA_REPORTBOX.produce_hw_vcpu_report(CURRENTSRCSITE,MyPARAMSDICT, SRC_DA)
         SRC_HWNUMA_REPORTBOX.sort_report(SRC_HWNUMA_REPORTBOX.get_sorting_keys())
-
+        
         SRC_SERVICEGRAPH_REPORTBOX.set_name("SRC-"+srcsitename+SRC_SERVICEGRAPH_REPORTBOX.ReportType)
         SRC_SERVICEGRAPH_REPORTBOX.produce_servicegraphreport(MyPARAMSDICT, SRC_DA)
         SRC_SERVICEGRAPH_REPORTBOX.sort_report(SRC_SERVICEGRAPH_REPORTBOX.get_sorting_keys())

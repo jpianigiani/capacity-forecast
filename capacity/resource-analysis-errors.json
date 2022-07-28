@@ -179,7 +179,7 @@
         {
             "Level":"CRITICAL",
             "Synopsis":"Pinned VMs use the same VCPU",
-            "Class":"virsh issue",
+            "Class":"Resource Contention on vCPU",
             "AfterErrorExecution":[ ]
         }
         ,
@@ -210,6 +210,13 @@
             "Level":"WARNING",
             "Synopsis":"VM uses vCPUs on multiple NUMAs",
             "Class":"VM cross NUMA Issue",
+            "AfterErrorExecution":[ ]
+        },
+        "00307":
+        {
+            "Level":"CRITICAL",
+            "Synopsis":"Unpinned VM on vCPU pinned to another VM",
+            "Class":"Possible vCPU stealing",
             "AfterErrorExecution":[ ]
         }
     }

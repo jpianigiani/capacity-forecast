@@ -543,6 +543,7 @@ class dictarray:
                 "--- DEBUG --- for nodo={:s} agglist={:s}".format(mynodo, appartenenza_nodo))
         return appartenenza_nodo
 
+
     def get_vmname(self,vmuuid):
         VMNAME=""
         for PROGETTO in self.SERVERDICT:
@@ -572,6 +573,7 @@ class dictarray:
                     ErrString="flavor {:} has properties, but empty: applying default values;using EXT as HostAgg, VM CPU UNPINNED".format(flavorrecord["Name"])
                     pars.cast_error("00102",ErrString)
                     return retval
+
             else:    
                 ErrString="flavor {:}: missing properties:  applying default values;using EXT as HostAgg, VM CPU UNPINNED".format(flavorrecord["Name"] )
                 pars.cast_error("00102",ErrString)
@@ -591,7 +593,7 @@ class dictarray:
                 minidict={}
                 minidict.fromkeys(mykeys)
 
-                for x in  myvalues:
+                for x in myvalues:
                     index=myvalues.index(x)
                     minidict[mykeys[index]]=x
                 return minidict
@@ -758,13 +760,19 @@ class report():
         Lines=[[]]
         MaxRows=128
         Lines=[['' for j in range(len(var_Keys) )] for i in range(MaxRows)]
+        if record is None:
+            print("DEBUG: LineWrapper : record is NONE")
+            exit(-1)
         MaxRows=0
         try: #CHANGETHIS
             myunwrappedline=''
             for ReportKeyItem in var_Keys:
                 RecordEntryIndex =var_Keys.index(ReportKeyItem)
                 var_FieldLen = self.get_fieldlength(ReportKeyItem)
-                var_RecordEntry= record[RecordEntryIndex]  
+                var_RecordEntry= record[RecordEntryIndex]
+                if var_RecordEntry is None:
+                    print("DEBUG LineWrapper: Field {:} is none \nfor record: ".format(ReportKeyItem,record))
+                    exit(-1)  
                 if type(var_RecordEntry)== list:
                     var_Entry=""
                     for ListItem in var_RecordEntry:
@@ -779,15 +787,24 @@ class report():
                 RowsValue = math.ceil(var_RecordEntryLen/var_FieldLen)
                 if RowsValue>MaxRows:
                     MaxRows=RowsValue
-
-                for NofLinesPerRecEntry in range(RowsValue):
-                    stringa_start = NofLinesPerRecEntry*var_FieldLen
-                    if (var_RecordEntryLen> stringa_start+ var_FieldLen  ):
-                        stringa_end = (1+NofLinesPerRecEntry)*var_FieldLen
-                    else:
-                        stringa_end =  var_RecordEntryLen
-                    newItem=var_Entry[stringa_start:stringa_end]
-                    Lines[NofLinesPerRecEntry][RecordEntryIndex]=newItem
+                if RowsValue==0:
+                    #print("DEBUG LineWrapper: Field {:} has Rowsvalue={:} \nfor record: ".format(ReportKeyItem,RowsValue,record))
+                    RowsValue=1
+                    Lines[0][RecordEntryIndex]=""
+                    #exit(-1)    
+                else:
+                    for NofLinesPerRecEntry in range(RowsValue):
+                        stringa_start = NofLinesPerRecEntry*var_FieldLen
+                        if (var_RecordEntryLen> stringa_start+ var_FieldLen  ):
+                            stringa_end = (1+NofLinesPerRecEntry)*var_FieldLen
+                        else:
+                            stringa_end =  var_RecordEntryLen
+                        try:
+                            newItem=var_Entry[stringa_start:stringa_end]
+                        except:
+                            print("DEBUG: Error in LineWrapper : ReportKeyItem : {:}, Var_Entry={:}".format(ReportKeyItem,var_Entry))
+                            exit(-1)
+                        Lines[NofLinesPerRecEntry][RecordEntryIndex]=newItem
                     
 
             retval=[]
@@ -803,7 +820,10 @@ class report():
             return retval,myunwrappedline
         except:
             traceback.print_exc(limit=None, file=None, chain=True)
+            print("Record:", record)
+            print("ReportKeyItem=",ReportKeyItem)
             self.PARAMS.cast_error("00009","Record:"+str(record))
+            exit(-1)
 
 
 
@@ -862,7 +882,7 @@ class report():
                 print("Record_ApplyTransforms: ERROR 04 START - \nMost likely FIELD is a list but it is not present in the application config JSON in the FIELDSLIST, so it is not classified neither list nor else\n")
                 print("transform function =",transform)
                 print("column:",columnname)
-                print("Field to apply is: {:} of type {:} and value {:}".format(key,mytype,value))
+                print("Field to apply is: {:} of type {:} and value {:} of type {;}".format(key,mytype,value,type))
                 print("Record: {:} , current field index {:}\n".format(record,row_itemnumber))
                 #print("Result of applying transform ")
                 #eval(transform)
