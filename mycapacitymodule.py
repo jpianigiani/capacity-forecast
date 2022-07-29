@@ -347,14 +347,15 @@ class parameters:
     def cast_error(self,ErrorCode, AddlData):
         NEWRECORD=[]
         a = str(self.__class__)
-        traceback.print_exc(limit=None, file=None, chain=True)
-        ErrorObjectClass= a.replace("'",'').replace("<",'').replace(">","").replace("class ","")
+        #traceback.print_exc(limit=None, file=None, chain=True)
+        #ErrorObjectClass= a.replace("'",'').replace("<",'').replace(">","").replace("class ","")
+
         ErrorInfo=self.ERROR_DICTIONARY[ErrorCode]
         #print(json.dumps(ErrorInfo,indent=30))
         ErrorObjectClass=ErrorInfo["Class"]
         SrcSuffix=self.get_param_value("SOURCE_SITE_SUFFIX")
         SiteName= self.parse_suffisso(SrcSuffix)
-        if ErrorInfo["Level"]=="CRITICAL":
+        if ErrorInfo["Level"]in self.APPLICATIONCONFIG_DICTIONARY["syslog"]["ErrorsToReport"]:
             NEWRECORD.append(SrcSuffix[0:8])
             NEWRECORD.append(SiteName)
             NEWRECORD.append(ErrorInfo["Level"])
@@ -566,45 +567,73 @@ class dictarray:
         # -----------------------------------------------------------------------
         # EXTRACTS FLAVOR PLACEMENT ZONE FROM FLAVOR PROPERTIES RECORD
         # -----------------------------------------------------------------------
+            if flavorrecord is None:
+                print("ERROR: Flavor record is none")
+                exit(-1)
+            
             if "Properties" in flavorrecord.keys():
-                MyFlavorPropertiesDict = flavorrecord["Properties"]
-                if len(MyFlavorPropertiesDict)==0:
+                
+                if len(flavorrecord["Properties"])==0:
                     retval=pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["DefaultFlavorProperties"]
                     ErrString="flavor {:} has properties, but empty: applying default values;using EXT as HostAgg, VM CPU UNPINNED".format(flavorrecord["Name"])
                     pars.cast_error("00102",ErrString)
                     return retval
-
+                else:
+                    StringReplace =pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["DefaultFlavorProperties_StringReplace"]
+                    #print("DEBUGGER00 keys are:",StringReplace.keys())
+                    for key in StringReplace.keys():
+                        temp = flavorrecord["Properties"].replace(' ','').replace("'","").upper()
+                        MyFlavorPropertiesDict=temp.replace(key,StringReplace[key])
+                        #print("DEBUGGER000 - MyFlavorPropertiesDict=",MyFlavorPropertiesDict)
+                        #MyFlavorPropertiesDict = flavorrecord["Properties"].replace(key,StringReplace[key]).upper()
             else:    
                 ErrString="flavor {:}: missing properties:  applying default values;using EXT as HostAgg, VM CPU UNPINNED".format(flavorrecord["Name"] )
                 pars.cast_error("00102",ErrString)
                 retval=pars.APPLICATIONCONFIGDICTIONARY["DefaulValue"]["DefaultFlavorProperties"]
                 return retval
-                
-            lista1 = MyFlavorPropertiesDict.split(',')
-            mykeys=[]
-            myvalues=[]
-            try:
-                for x in lista1:
-                    key=x.split("=")[0].strip()
-                    val=x.split("=")[1].strip().replace("'", "")
-                    mykeys.append(str(key))
-                # WARNING - REPLACEMENT OF DTNIMS WITH DT_NIMS since Flavors metadata have Placement zone MISPELLED
-                    myvalues.append(val.upper().replace("DTNIMS","DT_NIMS"))
-                minidict={}
-                minidict.fromkeys(mykeys)
 
-                for x in myvalues:
-                    index=myvalues.index(x)
-                    minidict[mykeys[index]]=x
-                return minidict
-
-            except:
-                traceback.print_exc(limit=None, file=None, chain=True)
+            if MyFlavorPropertiesDict is  None:
                 ErrString="dictarrays: parse_flavor_properties: {}".format(flavorrecord["Name"])
                 pars.cast_error("00102",ErrString)
-                retval={}
-        
-            return retval
+                retval=pars.APPLICATIONCONFIGDICTIONARY["DefaulValue"]["DefaultFlavorProperties"]
+                return retval
+
+            else:
+                lista1 = MyFlavorPropertiesDict.split(',')
+                #print("DEBUGGER0: myflavorpropertiesdict={:}\n\tDEBUGGER0 lista1={:}".format(json.dumps(MyFlavorPropertiesDict,indent=22),lista1))
+                if lista1 is None:
+                    print("DEBUGGER1: ERROR: lista0 is none")
+                    lista1=[]
+                    exit(-1)
+
+                mykeys=[]
+                myvalues=[]
+
+                for x in lista1:
+                    if x is not None:
+                        mypropertyentry=x.split("=")
+                        #print("\t\tDEBUGGER2: myarray={:}".format(mypropertyentry))
+                        key=x.split("=")[0]
+                        value=x.split("=")[1]
+                        #print("\t\tDEBUGGER2: x={:} key={:} value={:}".format(x,key,value))
+                        if key is not None:
+                            mykeys.append(str(key))
+                # WARNING - REPLACEMENT OF DTNIMS WITH DT_NIMS since Flavors metadata have Placement zone MISPELLED
+                        if value is not None:
+                            adjustedvalue=value.upper().replace("DTNIMS","DT_NIMS")
+                            myvalues.append(adjustedvalue)
+                        minidict={}
+                        minidict.fromkeys(mykeys)
+
+                        for x in myvalues:
+                            index=myvalues.index(x)
+                            minidict[mykeys[index]]=x
+
+                    else:
+                        print("\t\tDEBUGGER2: x is None")
+                return minidict
+
+
 
 # -------------------------------------------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------------------------------
@@ -694,8 +723,10 @@ class report():
 
 
     def UpdateLastRecordValueByKey(self, mykey, value):
-        if not mykey:
+
+        if mykey is None:
             print("UpdateLastRecordValueByKey : error : key is null") 
+            exit(-1)
         record= self.Report[len(self.Report)-1]
         if mykey in self.FIELDLISTS.keys():
             for x in value:
