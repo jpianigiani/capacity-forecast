@@ -53,6 +53,12 @@ class parameters:
     OPTIMIZE_BY_FILE = 2
 
     def __init__(self):
+        modulename="aop_logger"
+        if modulename not in sys.modules:
+            self.AOP_LOGGER_ENABLED=False
+        else:
+            self.AOP_LOGGER_ENABLED=True
+
         now = datetime.now()  # current date and time
         date_time = now.strftime("%d/%m/%Y %H:%M:%S")
         #date_time = now.strftime("%d/%m/%Y")
@@ -107,15 +113,18 @@ class parameters:
             traceback.print_exc(limit=None, file=None, chain=True)
             print("#-------------------------------------------------------------------------------------------------------------------")
             print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application configuration file {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
-            print("\t Files {:} and  {:} must be , from thedirectory as python main executable, as follows: {:}".format(self.CONFIGFILE, self.ERRORFILE,self.PATHFORAPPLICATIONCONFIGDATA))
+            print("\t Files {:} and  {:} must be , from the directory as python main executable, as follows: {:}".format(self.CONFIGFILE, self.ERRORFILE,self.PATHFORAPPLICATIONCONFIGDATA))
             print("#-------------------------------------------------------------------------------------------------------------------")
             exit(-1)
+         
+        self.DEBUG=self.APPLICATIONCONFIG_DICTIONARY["Application_Parameters"]["DEBUG"]
         #-------------------------------------------------------------------------------------------------------------------
-        mysyslog=aop_logger(3,self.SYSLOGFILE)
-        myloghandler=mysyslog.syslog_handler(
-                address= (self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Target"],
-                self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Port"]))
-        self.logger=mysyslog.logger
+        if self.AOP_LOGGER_ENABLED:
+            mysyslog=aop_logger(3,self.SYSLOGFILE)
+            myloghandler=mysyslog.syslog_handler(
+                    address= (self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Target"],
+                    self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Port"]))
+            self.logger=mysyslog.logger
         #-------------------------------------------------------------------------------------------------------------------
 
 
@@ -338,14 +347,15 @@ class parameters:
     def cast_error(self,ErrorCode, AddlData):
         NEWRECORD=[]
         a = str(self.__class__)
-        traceback.print_exc(limit=None, file=None, chain=True)
-        ErrorObjectClass= a.replace("'",'').replace("<",'').replace(">","").replace("class ","")
+        #traceback.print_exc(limit=None, file=None, chain=True)
+        #ErrorObjectClass= a.replace("'",'').replace("<",'').replace(">","").replace("class ","")
+
         ErrorInfo=self.ERROR_DICTIONARY[ErrorCode]
         #print(json.dumps(ErrorInfo,indent=30))
         ErrorObjectClass=ErrorInfo["Class"]
         SrcSuffix=self.get_param_value("SOURCE_SITE_SUFFIX")
         SiteName= self.parse_suffisso(SrcSuffix)
-        if ErrorInfo["Level"]=="CRITICAL":
+        if ErrorInfo["Level"]in self.APPLICATIONCONFIG_DICTIONARY["syslog"]["ErrorsToReport"]:
             NEWRECORD.append(SrcSuffix[0:8])
             NEWRECORD.append(SiteName)
             NEWRECORD.append(ErrorInfo["Level"])
@@ -354,14 +364,16 @@ class parameters:
             NEWRECORD.append(ErrorInfo["Synopsis"])
             NEWRECORD.append(AddlData)
             #NEWRECORD.append(ErrorInfo)
-            syslogstring="Timestamp: {:9s} Site: {:12s} ErrCode: {:5s} Class:{:30s} Synopsis:{:60s}: {:120s}".format(SrcSuffix[0:8],
+
+            if self.AOP_LOGGER_ENABLED:
+                syslogstring="Timestamp: {:9s} Site: {:12s} ErrCode: {:5s} Class:{:30s} Synopsis:{:60s}: {:120s}".format(SrcSuffix[0:8],
                             SiteName,ErrorCode,ErrorObjectClass,ErrorInfo["Synopsis"],AddlData)
-            if ErrorInfo["Level"]=="CRITICAL":
-                self.logger.critical(syslogstring)
-            elif ErrorInfo["Level"]=="ERROR":
-                self.logger.error(syslogstring)
-            elif ErrorInfo["Level"]=="WARNING":
-                self.logger.warning(syslogstring)
+                if ErrorInfo["Level"]=="CRITICAL":
+                    self.logger.critical(syslogstring)
+                elif ErrorInfo["Level"]=="ERROR":
+                    self.logger.error(syslogstring)
+                elif ErrorInfo["Level"]=="WARNING":
+                    self.logger.warning(syslogstring)
 
             self.ERROR_REPORT.append(NEWRECORD)
         
@@ -423,7 +435,7 @@ class dictarray:
                 with open(FILENAME, 'r') as file1:
                     TMPJSON = json.load(file1)
                     DICT_ARRAY.append(TMPJSON)
-                    # if  DEBUG>1:
+                    # if  pars.DEBUG>1:
                     #print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
                 COUNT += 1
 
@@ -447,8 +459,8 @@ class dictarray:
                     with open(FILENAME, 'r') as file1:
                         TMPJSON = json.load(file1)
                         DICT_ARRAY.append(TMPJSON)
-                        # if  DEBUG>1:
-                        #print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
+                        if  pars.DEBUG>1:
+                            print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
                     COUNT += 1
                 except (IOError, EOFError) as e:
                     self.SKIPSERVICEGRAPH=True
@@ -471,8 +483,8 @@ class dictarray:
                     with open(FILENAME, 'r') as file1:
                         TMPJSON = json.load(file1)
                         DICT_ARRAY.append(TMPJSON)
-                        # if  DEBUG>1:
-                        #print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
+                        #if  pars.DEBUG>1:
+                        #    print("load_jsons_into_dictarrays:  Loading  dict in array from {} for {} which is {} items long and {}\n".format(pars[paramname], FILENAME, len(TMPJSON),type(TMPJSON)))
                     COUNT += 1
                 except (IOError, EOFError) as e:
                     self.HWNUMAAWARE=True
@@ -532,6 +544,7 @@ class dictarray:
                 "--- DEBUG --- for nodo={:s} agglist={:s}".format(mynodo, appartenenza_nodo))
         return appartenenza_nodo
 
+
     def get_vmname(self,vmuuid):
         VMNAME=""
         for PROGETTO in self.SERVERDICT:
@@ -547,73 +560,80 @@ class dictarray:
             VMNAME="!!UNKNOWN!!"
         return VMNAME
 
-    def site_based_flavor_properties_parser(self, pars, flavorrecord, site_name,vmname, hwcpupolicy):
-        if (site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabTrafficSites"]+
-            pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveTrafficSites"]):
-            Warning= "VM {:} Flavor with hw:cpu_policy=-{:}- in traffic site".format(vmname,hwcpupolicy)
-            if hwcpupolicy!="DEDICATED":
-                #print("DEBUG site_based_flavor_properties_parser")
-                #print(json.dumps(flavorrecord,indent=22))
 
-                pars.cast_error("00106",Warning)
-        elif (site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabMgmtSites"]) :
-            Warning= "VM {:} Flavor with hw:cpu_policy ={:} in Lab Mgmt site".format(vmname,hwcpupolicy)
-            if hwcpupolicy!="DEDICATED":
-                pars.cast_error("00107",Warning)
-        elif (site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveMgmtSites"]) :
-            Warning= "VM {:} Flavor with hw:cpu_policy={:} in Live Mgmt site".format(vmname,hwcpupolicy)
-            if hwcpupolicy!="DEDICATED":
-                pars.cast_error("00104",Warning)
-        else:
-            pass
                
 
     def parse_flavor_properties(self, pars,flavorrecord):
         # -----------------------------------------------------------------------
         # EXTRACTS FLAVOR PLACEMENT ZONE FROM FLAVOR PROPERTIES RECORD
         # -----------------------------------------------------------------------
+            if flavorrecord is None:
+                print("ERROR: Flavor record is none")
+                exit(-1)
+            
             if "Properties" in flavorrecord.keys():
-                MyFlavorPropertiesDict = flavorrecord["Properties"]
-                if len(MyFlavorPropertiesDict)==0:
-                    retval=pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["DefaultFlavorProperties"]
-                    ErrString="flavor {:}: missing properties".format(flavorrecord["Name"])
-                    #pars.cast_error("00101",ErrString)
-                    #print(ErrString)
-                    
-                    #retval={}
-                    return retval
-            else:    
-                ErrString="flavor {:}: missing properties!! Using EXT as HostAgg, VM CPU UNPINNED".format(flavorrecord["Name"] )
-                pars.cast_error("00101",ErrString)
-                retval=pars.APPLICATIONCONFIGDICTIONARY["DefaulValue"]["DefaultFlavorProperties"]
-                #DT_NIMS_EXT"
-                return retval
                 
-            lista1 = MyFlavorPropertiesDict.split(',')
-            mykeys=[]
-            myvalues=[]
-            try:
-                for x in lista1:
-                    key=x.split("=")[0].strip()
-                    val=x.split("=")[1].strip().replace("'", "")
-                    mykeys.append(str(key))
-                # WARNING - REPLACEMENT OF DTNIMS WITH DT_NIMS since Flavors metadata have Placement zone MISPELLED
-                    myvalues.append(val.upper().replace("DTNIMS","DT_NIMS"))
-                minidict={}
-                minidict.fromkeys(mykeys)
+                if len(flavorrecord["Properties"])==0:
+                    retval=pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["DefaultFlavorProperties"]
+                    ErrString="flavor {:} has properties, but empty: applying default values;using EXT as HostAgg, VM CPU UNPINNED".format(flavorrecord["Name"])
+                    pars.cast_error("00102",ErrString)
+                    return retval
+                else:
+                    StringReplace =pars.APPLICATIONCONFIG_DICTIONARY["DefaultValues"]["DefaultFlavorProperties_StringReplace"]
+                    #print("DEBUGGER00 keys are:",StringReplace.keys())
+                    for key in StringReplace.keys():
+                        temp = flavorrecord["Properties"].replace(' ','').replace("'","").upper()
+                        MyFlavorPropertiesDict=temp.replace(key,StringReplace[key])
+                        #print("DEBUGGER000 - MyFlavorPropertiesDict=",MyFlavorPropertiesDict)
+                        #MyFlavorPropertiesDict = flavorrecord["Properties"].replace(key,StringReplace[key]).upper()
+            else:    
+                ErrString="flavor {:}: missing properties:  applying default values;using EXT as HostAgg, VM CPU UNPINNED".format(flavorrecord["Name"] )
+                pars.cast_error("00102",ErrString)
+                retval=pars.APPLICATIONCONFIGDICTIONARY["DefaulValue"]["DefaultFlavorProperties"]
+                return retval
 
-                for x in  myvalues:
-                    index=myvalues.index(x)
-                    minidict[mykeys[index]]=x
-                return minidict
-
-            except:
-                traceback.print_exc(limit=None, file=None, chain=True)
+            if MyFlavorPropertiesDict is  None:
                 ErrString="dictarrays: parse_flavor_properties: {}".format(flavorrecord["Name"])
                 pars.cast_error("00102",ErrString)
-                retval={}
-        
-            return retval
+                retval=pars.APPLICATIONCONFIGDICTIONARY["DefaulValue"]["DefaultFlavorProperties"]
+                return retval
+
+            else:
+                lista1 = MyFlavorPropertiesDict.split(',')
+                #print("DEBUGGER0: myflavorpropertiesdict={:}\n\tDEBUGGER0 lista1={:}".format(json.dumps(MyFlavorPropertiesDict,indent=22),lista1))
+                if lista1 is None:
+                    print("DEBUGGER1: ERROR: lista0 is none")
+                    lista1=[]
+                    exit(-1)
+
+                mykeys=[]
+                myvalues=[]
+
+                for x in lista1:
+                    if x is not None:
+                        mypropertyentry=x.split("=")
+                        #print("\t\tDEBUGGER2: myarray={:}".format(mypropertyentry))
+                        key=x.split("=")[0]
+                        value=x.split("=")[1]
+                        #print("\t\tDEBUGGER2: x={:} key={:} value={:}".format(x,key,value))
+                        if key is not None:
+                            mykeys.append(str(key))
+                # WARNING - REPLACEMENT OF DTNIMS WITH DT_NIMS since Flavors metadata have Placement zone MISPELLED
+                        if value is not None:
+                            adjustedvalue=value.upper().replace("DTNIMS","DT_NIMS")
+                            myvalues.append(adjustedvalue)
+                        minidict={}
+                        minidict.fromkeys(mykeys)
+
+                        for x in myvalues:
+                            index=myvalues.index(x)
+                            minidict[mykeys[index]]=x
+
+                    else:
+                        print("\t\tDEBUGGER2: x is None")
+                return minidict
+
+
 
 # -------------------------------------------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------------------------------
@@ -703,8 +723,10 @@ class report():
 
 
     def UpdateLastRecordValueByKey(self, mykey, value):
-        if not mykey:
+
+        if mykey is None:
             print("UpdateLastRecordValueByKey : error : key is null") 
+            exit(-1)
         record= self.Report[len(self.Report)-1]
         if mykey in self.FIELDLISTS.keys():
             for x in value:
@@ -769,13 +791,19 @@ class report():
         Lines=[[]]
         MaxRows=128
         Lines=[['' for j in range(len(var_Keys) )] for i in range(MaxRows)]
+        if record is None:
+            print("DEBUG: LineWrapper : record is NONE")
+            exit(-1)
         MaxRows=0
         try: #CHANGETHIS
             myunwrappedline=''
             for ReportKeyItem in var_Keys:
                 RecordEntryIndex =var_Keys.index(ReportKeyItem)
                 var_FieldLen = self.get_fieldlength(ReportKeyItem)
-                var_RecordEntry= record[RecordEntryIndex]  
+                var_RecordEntry= record[RecordEntryIndex]
+                if var_RecordEntry is None:
+                    print("DEBUG LineWrapper: Field {:} is none \nfor record: ".format(ReportKeyItem,record))
+                    exit(-1)  
                 if type(var_RecordEntry)== list:
                     var_Entry=""
                     for ListItem in var_RecordEntry:
@@ -790,15 +818,24 @@ class report():
                 RowsValue = math.ceil(var_RecordEntryLen/var_FieldLen)
                 if RowsValue>MaxRows:
                     MaxRows=RowsValue
-
-                for NofLinesPerRecEntry in range(RowsValue):
-                    stringa_start = NofLinesPerRecEntry*var_FieldLen
-                    if (var_RecordEntryLen> stringa_start+ var_FieldLen  ):
-                        stringa_end = (1+NofLinesPerRecEntry)*var_FieldLen
-                    else:
-                        stringa_end =  var_RecordEntryLen
-                    newItem=var_Entry[stringa_start:stringa_end]
-                    Lines[NofLinesPerRecEntry][RecordEntryIndex]=newItem
+                if RowsValue==0:
+                    #print("DEBUG LineWrapper: Field {:} has Rowsvalue={:} \nfor record: ".format(ReportKeyItem,RowsValue,record))
+                    RowsValue=1
+                    Lines[0][RecordEntryIndex]=""
+                    #exit(-1)    
+                else:
+                    for NofLinesPerRecEntry in range(RowsValue):
+                        stringa_start = NofLinesPerRecEntry*var_FieldLen
+                        if (var_RecordEntryLen> stringa_start+ var_FieldLen  ):
+                            stringa_end = (1+NofLinesPerRecEntry)*var_FieldLen
+                        else:
+                            stringa_end =  var_RecordEntryLen
+                        try:
+                            newItem=var_Entry[stringa_start:stringa_end]
+                        except:
+                            print("DEBUG: Error in LineWrapper : ReportKeyItem : {:}, Var_Entry={:}".format(ReportKeyItem,var_Entry))
+                            exit(-1)
+                        Lines[NofLinesPerRecEntry][RecordEntryIndex]=newItem
                     
 
             retval=[]
@@ -814,7 +851,10 @@ class report():
             return retval,myunwrappedline
         except:
             traceback.print_exc(limit=None, file=None, chain=True)
+            print("Record:", record)
+            print("ReportKeyItem=",ReportKeyItem)
             self.PARAMS.cast_error("00009","Record:"+str(record))
+            exit(-1)
 
 
 
@@ -873,7 +913,7 @@ class report():
                 print("Record_ApplyTransforms: ERROR 04 START - \nMost likely FIELD is a list but it is not present in the application config JSON in the FIELDSLIST, so it is not classified neither list nor else\n")
                 print("transform function =",transform)
                 print("column:",columnname)
-                print("Field to apply is: {:} of type {:} and value {:}".format(key,mytype,value))
+                print("Field to apply is: {:} of type {:} and value {:} of type {;}".format(key,mytype,value,type))
                 print("Record: {:} , current field index {:}\n".format(record,row_itemnumber))
                 #print("Result of applying transform ")
                 #eval(transform)

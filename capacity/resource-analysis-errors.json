@@ -179,7 +179,7 @@
         {
             "Level":"CRITICAL",
             "Synopsis":"Pinned VMs use the same VCPU",
-            "Class":"virsh issue",
+            "Class":"Resource Contention on vCPU",
             "AfterErrorExecution":[ ]
         }
         ,
@@ -211,5 +211,27 @@
             "Synopsis":"VM uses vCPUs on multiple NUMAs",
             "Class":"VM cross NUMA Issue",
             "AfterErrorExecution":[ ]
+        },
+        "00307":
+        {
+            "Level":"CRITICAL",
+            "Synopsis":"Unpinned VM on vCPU pinned to another VM",
+            "Class":"Possible vCPU stealing",
+            "AfterErrorExecution":[ ]
+        },
+        "00308":
+        {
+            "Level":"CRITICAL",
+            "Synopsis":"LOW FREE MEMORY on compute",
+            "Class":"Compute resources exhaust",
+            "AfterErrorExecution":[ ]
+        },
+        "00309":
+        {
+            "Level":"CRITICAL",
+            "Synopsis":"VM unpinned in virsh, but pinned in Flavor",
+            "Class":"Needs reinstantiation",
+            "AfterErrorExecution":[ ]
         }
+           
     }

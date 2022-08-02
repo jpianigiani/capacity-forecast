@@ -1,9 +1,11 @@
 {
-"syslog":{"Target":"","Port":"514"},
+"syslog":{"Target":"172.23.94.71","Port":"5143", "ErrorsToReport":["CRITICAL"]},
 "DefaultValues":
     {
         "DefaultFlavorProperties":      {"vnf_type":"DT_NIMS_EXT"},
+        "DefaultFlavorProperties_StringReplace":      {"DTNIMS":"DT_NIMS"},
         "ServicesToSkip": ["service", "admin", "tempest", "c_rally", "DeleteMe", "Kashif"],
+        "PerNUMA_FreeRAM_ThresholdPct":10,
         "ServiceNameWildCard":"#"
         
     },
@@ -11,7 +13,7 @@
 "ReportsSettings":
     { 
     "ReportTypesNotToBePrintedOnScreen":["SERVICEGRAPH_REPORT"],
-    "WrapLinesWhenWritingToFiles":true
+    "WrapLinesWhenWritingToFiles":false
     }
     ,
 
@@ -55,6 +57,7 @@
         "HW_OPTIMIZATION_MODE": "", 
         "SKIPMGMTSITE": false,
         "JUSTSOURCE": true,
+        "DEBUG":1,
         "INITIALSERVICEVALUE":[]
     },
     "User_CLI_Visible_Parameters": 
@@ -119,7 +122,7 @@
         "ERROR_REPORT_SORTING_KEYS": ["TimeStamp","SourceSite","ErrLevel","ErrorCode"],
         "SERVICEGRAPH_REPORT_KEYS": ["Project","vnfname","VMname","VirtualPort","PacketMode", "AAP", "Network","Subnet","SecGroups","Owner","MirrorTo"],
         "SERVICEGRAPH_REPORT_SORTING_KEYS":["Project","vnfname","VMname", "Network"],
-        "HW_VCPU_REPORT_KEYS":["TimeStamp", "Site", "AZ", "Rack", "HypervisorHostname", "NUMA_id","vCPUsAvailPerNUMA","vCPUsUsedPerNUMA","vCPU_id", "vCPU_Load_after","NOfVMs","NofPinnedVMs","VM_names","Warning"],
+        "HW_VCPU_REPORT_KEYS":["TimeStamp", "Site", "AZ", "Rack", "HypervisorHostname", "NUMA_id","vCPUsAvailPerNUMA","vCPUsUsedPerNUMA","vCPU_id", "vCPU_Load_after","NOfVMs","NofPinnedVMs","VM_names","NUMA_Warning"],
         "HW_VCPU_REPORT_SORTING_KEYS":["Site", "AZ", "Rack", "HypervisorHostname", "vCPU_id"]
 
 
@@ -151,7 +154,7 @@
         "TargetHostAggr": 4,
         "NewVMs": 11, 
         "ExistingVMs":99,
-        "VM_names":130,
+        "VM_names":52,
         "VCPUsAvailPerRack": 10, 
         "RAMperRack": 10, 
         "VCPUsUsedPerRack":10, 
@@ -176,6 +179,7 @@
         "Suffix": 20, 
         "Projects": 150, 
         "Warning": 20,
+        "NUMA_Warning":130,
         "NOfVMs": 6,
         "NofPinnedVMs":6,
         "VCPUsUsed":10, 
@@ -188,7 +192,7 @@
         "ErrLevel":9,
         "ErrorCode":5,
         "Synopsis":60,
-        "Description":90,
+        "Description":130,
         "ErrorInfo":40,
         "VirtualPort": 70,
         "PacketMode": 6,
@@ -249,6 +253,7 @@
         "VCPUsAvail":"value.rjust(length)",
         "NOfVMs": "value.rjust(length)",
         "AAP":"self.shortenAAP(value).ljust(length)",
+        "vCPU_Load_after":"self.show_as_percentage(value,length)",
         "default": "value.rjust(length)"
     } ,
 "FieldTransformsAttributes":
