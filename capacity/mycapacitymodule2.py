@@ -42,7 +42,7 @@ class vm_report(report):
             
             IsLabMgmtSite=site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabMgmtSites"]
             IsLabTrfSite=site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabTrafficSites"]
-            IsLiveMgmtSite=site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabMgmtSites"]
+            IsLiveMgmtSite=site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveMgmtSites"]
             IsLiveTrfSite=site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabTrafficSites"]            
             IsMgmt=IsLabMgmtSite or IsLiveMgmtSite
             IsTrf=IsLabTrfSite or IsLiveTrfSite
@@ -61,7 +61,13 @@ class vm_report(report):
                 if hwcpupolicy!="DEDICATED":
                     pars.cast_error("00104",Warning)
             else:
-                print("ERROR: site_based_flavor_properties_parser: UNEXPECTED CASE")
+                print("ERROR: site_based_flavor_properties_parser: UNEXPECTED CASE : site : >{:}<".format(site_name))
+                print("pars.APPLICATIONCONFIG_DICTIONARY['SitesCategories']['LabMgmtSites']=", pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabMgmtSites"])
+                print("IsLabMgmtSite=",IsLabMgmtSite)
+                print("IsLabTrfSite=",IsLabTrfSite)
+                print("IsLiveMgmtSite=",IsLiveMgmtSite)
+                print("IsLiveTrfSite=",IsLiveTrfSite)
+                print("IsTrf=",IsTrf)
                 exit(-1)
                 pass
 
@@ -142,12 +148,19 @@ class vm_report(report):
                         FOUNDFLAVOR=False
                         Warning=''
                         for y in dictarray_object.FLAVOR_LIST:
-                            str_FLAVOR=str(y["ID"])
-                            str_VMFLAVORNAME=str(y["Name"])
+                            if y["ID"] is None:
+                                str_FLAVOR=""
+                            else:
+                                str_FLAVOR=str(y["ID"])
+                            
+                            if y["Name"] is None:
+                                str_VMFLAVORNAME=str_FLAVOR
+                            else:
+                                str_VMFLAVORNAME=str(y["Name"])
                             
     #------------------------------------------------------------------------
                             # NEW PARSE FLAVORS IMPLEMENTATION
-                            print("DEBUGGER: FlavorRecord =",json.dumps(y,indent=22))
+                            #print("DEBUGGER: FlavorRecord =",json.dumps(y,indent=22))
 
                             try:
                                 minidict=dictarray_object.parse_flavor_properties(pars,y)
@@ -171,27 +184,27 @@ class vm_report(report):
 
                                         #print(json.dumps(minidict,indent=22))
                                         try:
-                                            if "vnf_type" in minidict.keys():
-                                                str_FLAVORHOSTAGGR=minidict["vnf_type"]
+                                            if "VNF_TYPE" in minidict.keys():
+                                                str_FLAVORHOSTAGGR=minidict["VNF_TYPE"]
                                             else:
                                                 str_FLAVORHOSTAGGR='None'
-                                            if "hw:cpu_policy" in minidict.keys():
-                                                if minidict["hw:cpu_policy"] is None:
+                                            if "HW:CPU_POLICY" in minidict.keys():
+                                                if minidict["HW:CPU_POLICY"] is None:
                                                     hwpolicy=""
                                                 else:
-                                                    hwpolicy=minidict["hw:cpu_policy"].upper()
+                                                    hwpolicy=minidict["HW:CPU_POLICY"]
 
                                                     site_based_flavor_properties_parser(pars, minidict, site_name,str(VM["Name"]),hwpolicy)
                                             else:
                                                     site_based_flavor_properties_parser(pars, minidict, site_name,str(VM["Name"]))
                                         
-                                            if "hw:emulator_threads_policy" in minidict.keys():
-                                                if minidict["hw:emulator_threads_policy"] is None:
+                                            if "HW:EMULATOR_THREADS_POLICY" in minidict.keys():
+                                                if minidict["HW:EMULATOR_THREADS_POLICY"] is None:
                                                     myvalue=""
                                                 else:
-                                                    myvalue=minidict["hw:emulator_threads_policy"]
+                                                    myvalue=minidict["HW:EMULATOR_THREADS_POLICY"]
                                                 if str_PROGETTO.find("NIMS_Core")>-1 and myvalue.upper()!="SHARE":
-                                                        Warning= "VM {:} Flavor without HW:emulator_thread_policy set".format(str(VM["Name"]))
+                                                        Warning= "VM {:} has Flavor without hw:emulator_thread_policy set".format(str(VM["Name"]))
                                                         pars.cast_error("00105",Warning)
 
    
@@ -225,7 +238,6 @@ class vm_report(report):
                             pars.cast_error("00103",ErrString)
                             TEMP_RES=[]
 
-        counter+=1
 
 
 
@@ -1762,8 +1774,8 @@ class hw_vcpu_report(report):
                                     minidict= dictarray_object.parse_flavor_properties(pars,FLAVOR)
                                     if pars.DEBUG==1:
                                         print_debug(debug_file,pars,mycolor+"\tDEBUG7: parsing flavor {:}".format(FLAVOR["ID"]))
-                                    if "hw:cpu_policy" in minidict.keys():
-                                        if minidict["hw:cpu_policy"].upper()=="DEDICATED":
+                                    if "HW:CPU_POLICY" in minidict.keys():
+                                        if minidict["HW:CPU_POLICY"].upper()=="DEDICATED":
                                             VM_IS_CPU_PINNED=True
                                     
                                     if pars.DEBUG==1:
@@ -1850,7 +1862,8 @@ class hw_vcpu_report(report):
                                     print_debug(debug_file,pars,"\tDEBUG8: Numa {:} \t\tPinn After ={:}".format(myNUMAidstring,myNofPinnedVMsperCPU))
 
                                 if CrossNumaUsage:
-                                        print_debug(debug_file,pars,"---------------------------------------------------------------------")
+                                        if pars.DEBUG==1:
+                                            print_debug(debug_file,pars,"---------------------------------------------------------------------")
                                         ErrString="ERROR instance {:} with VMName = {:} , IS_CPUPINNED={:}  uses :".format(myInstance,VMNAME,VM_IS_CPU_PINNED)
                                         ErrString+=("\tvcpu {:}  as per VMUsesList {:} ".format(vcpu,vcpus_myVMcanuse))
                                         ErrString+="\tnot existing in numa VCPUs for compute  {:}, numa  {:}, NUMA CPU list={:} ".format(nomecorto, myNUMAidstring,myvCPUperNUMAlist)
@@ -1865,11 +1878,10 @@ class hw_vcpu_report(report):
 # vcpus_myVMcanuse = list of vCPUs used by the current VM
 #virsh_NofActuallyUsedvCPUsbyVM = number of vCPUs used by current VM. 
 # myvCPUperNUMA_vms = list of VMs on each VCPU for this compute:NUMA
-# myNofPinnedVMsperCPU = list of pinned VMs on each VCPU for this compute:NUMA
+# myNofPinnedVMsperCPU = # of pinned VMs on each VCPU for this compute:NUMA
 # myvCPUperNUMAload = Load for each vCPU on this compute:NUMA
-
-                if pars.DEBUG>=2:
-                    print("\t\t\tDEBUG 10......................")
+#myvCPUperNUMA_unpinnedvms = list of unpinned VMs per numa:vcpuID
+#myvCPUperNUMA_pinnedvms=list of pinned VMs per numa:vcpuID
 
                 # For each VCPU in this NUMA
                 TotalCPULoadPerNUMA=0
@@ -1885,7 +1897,7 @@ class hw_vcpu_report(report):
                         pars.cast_error("00302",ErrString)
 
                     if myNofPinnedVMsperCPU[myVCPUindex]==1 and len(myvCPUperNUMA_vms[VCPU_per_numa_index])>1:
-                        ErrString=menu.Magenta+"Unpinned VM:{:} may steal resources to pinned VM on compute:{:},NUMA:{:},vCPU:{:}".format(",".join(myvCPUperNUMA_unpinnedvms[myVCPUindex]),nomecorto,myNUMAidstring,str(myVCPUID))
+                        ErrString=menu.Magenta+"Unpinned VMs:{:} + Pinned VM:{:} using compute:{:} NUMA:{:} vCPU:{:}".format(",".join(myvCPUperNUMA_unpinnedvms[myVCPUindex]),",".join(myvCPUperNUMA_pinnedvms[myVCPUindex]),nomecorto,myNUMAidstring,str(myVCPUID))
                         if PossibleResourceStealingCast==False:
                             Warnings.append(ErrString)
                             PossibleResourceStealingCast=True

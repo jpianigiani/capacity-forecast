@@ -1,8 +1,9 @@
 {
-"syslog":{"Target":"","Port":"514"},
+"syslog":{"Target":"172.23.94.71","Port":"5143", "ErrorsToReport":["CRITICAL"]},
 "DefaultValues":
     {
         "DefaultFlavorProperties":      {"vnf_type":"DT_NIMS_EXT"},
+        "DefaultFlavorProperties_StringReplace":      {"DTNIMS":"DT_NIMS"},
         "ServicesToSkip": ["service", "admin", "tempest", "c_rally", "DeleteMe", "Kashif"],
         "ServiceNameWildCard":"#"
         
