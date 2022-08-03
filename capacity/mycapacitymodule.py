@@ -17,7 +17,6 @@ import traceback
 from aop_logger import aop_logger
 
 
-DEBUG = 0
 
 # -------------------------------------------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------------------------------
@@ -119,12 +118,16 @@ class parameters:
          
         self.DEBUG=self.APPLICATIONCONFIG_DICTIONARY["Application_Parameters"]["DEBUG"]
         #-------------------------------------------------------------------------------------------------------------------
-        if self.AOP_LOGGER_ENABLED:
-            mysyslog=aop_logger(3,self.SYSLOGFILE)
-            myloghandler=mysyslog.syslog_handler(
-                    address= (self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Target"],
-                    self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Port"]))
-            self.logger=mysyslog.logger
+        try:
+            if self.AOP_LOGGER_ENABLED:
+                mysyslog=aop_logger(3,self.SYSLOGFILE)
+                myloghandler=mysyslog.syslog_handler(
+                        address= (self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Target"],
+                        self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Port"]))
+                self.logger=mysyslog.logger
+        except NameError as Err:
+            print("AOP-LOGGER disabled")
+
         #-------------------------------------------------------------------------------------------------------------------
 
 
@@ -365,16 +368,18 @@ class parameters:
             NEWRECORD.append(AddlData)
             #NEWRECORD.append(ErrorInfo)
 
-            if self.AOP_LOGGER_ENABLED:
-                syslogstring="Timestamp: {:9s} Site: {:12s} ErrCode: {:5s} Class:{:30s} Synopsis:{:60s}: {:120s}".format(SrcSuffix[0:8],
-                            SiteName,ErrorCode,ErrorObjectClass,ErrorInfo["Synopsis"],AddlData)
-                if ErrorInfo["Level"]=="CRITICAL":
-                    self.logger.critical(syslogstring)
-                elif ErrorInfo["Level"]=="ERROR":
-                    self.logger.error(syslogstring)
-                elif ErrorInfo["Level"]=="WARNING":
-                    self.logger.warning(syslogstring)
-
+            try:
+                if self.AOP_LOGGER_ENABLED:
+                    syslogstring="Timestamp: {:9s} Site: {:12s} ErrCode: {:5s} Class:{:30s} Synopsis:{:60s}: {:120s}".format(SrcSuffix[0:8],
+                                SiteName,ErrorCode,ErrorObjectClass,ErrorInfo["Synopsis"],AddlData)
+                    if ErrorInfo["Level"]=="CRITICAL":
+                        self.logger.critical(syslogstring)
+                    elif ErrorInfo["Level"]=="ERROR":
+                        self.logger.error(syslogstring)
+                    elif ErrorInfo["Level"]=="WARNING":
+                        self.logger.warning(syslogstring)
+            except NameError as Err:
+                pass
             self.ERROR_REPORT.append(NEWRECORD)
         
         
@@ -539,9 +544,7 @@ class dictarray:
         for item in self.AGGREGATE_LIST:
             if mynodo in item["hosts"]:
                 appartenenza_nodo.append(str(item["name"]))
-        if DEBUG >= 3:
-            print(
-                "--- DEBUG --- for nodo={:s} agglist={:s}".format(mynodo, appartenenza_nodo))
+
         return appartenenza_nodo
 
 

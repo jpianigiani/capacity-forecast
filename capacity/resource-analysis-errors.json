@@ -221,7 +221,7 @@
         },
         "00308":
         {
-            "Level":"CRITICAL",
+            "Level":"ERROR",
             "Synopsis":"LOW FREE MEMORY on compute",
             "Class":"Compute resources exhaust",
             "AfterErrorExecution":[ ]

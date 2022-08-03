@@ -45,7 +45,7 @@ class vm_report(report):
             IsLabMgmtSite=site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabMgmtSites"]
             IsLabTrfSite=site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabTrafficSites"]
             IsLiveMgmtSite=site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveMgmtSites"]
-            IsLiveTrfSite=site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabTrafficSites"]            
+            IsLiveTrfSite=site_name in pars.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveTrafficSites"]            
             IsMgmt=IsLabMgmtSite or IsLiveMgmtSite
             IsTrf=IsLabTrfSite or IsLiveTrfSite
 
@@ -1622,10 +1622,11 @@ class hw_vcpu_report(report):
                     ListNoDupes.append(Item)
             return ListNoDupes
 
-        def print_debug(file, pars,line):
+        def print_debug(file, pars,line, indent=0):
             print(line)
             if pars.DEBUG==1:
-                file.write(line)
+                stringindent="\t"*indent
+                file.write(stringindent+line)
                 file.write("\n")
 
         def is_instance_virshpinned(vcpus):
@@ -1657,8 +1658,7 @@ class hw_vcpu_report(report):
                 mycolor=menu.Yellow
                 print_debug(debug_file,pars,menu.Yellow+"------------------------------------------------------------------------------------------------------------------------------------------")
                 print_debug(debug_file,pars,"------------------------------------------------------------------------------------------------------------------------------------------")
-                print_debug(debug_file,pars,"DEBUG1 INFO produce_hw_vcpu_report\n")
-                print_debug(debug_file,pars,"DEBUG1 INFO Nodo=:{:} Nodo_longformat={:}".format(nodo,nodo_longformat))
+                print_debug(debug_file,pars,"DEBUG0: INFO Nodo=:{:} Nodo_longformat={:}".format(nodo,nodo_longformat),0)
                 #print(dictarray_object.HYPERVISOR_VCPU.keys())
 
             # GET THE RECORD from VIRSH JSON for this compute
@@ -1668,7 +1668,7 @@ class hw_vcpu_report(report):
                 #print(json.dumps(numarecord, indent=22))
                 #print("DEBUG2 end produce_hw_vcpu_report: Dictionary ")
                 print_debug(debug_file,pars,menu.Yellow+"---------------------------------------------------------------------")
-                print_debug(debug_file,pars,"DEBUG2: INFO -- numarecord['node'].keys():".format(numarecord["node"].keys()))
+                print_debug(debug_file,pars,"DEBUG1: INFO -- numarecord['node'].keys():".format(numarecord["node"].keys()),1)
             
             #For each NUMA in HYPERVISOR, parsing JSON VIRSH...
             for myNUMAidstring in numarecord["node"].keys():
@@ -1679,7 +1679,7 @@ class hw_vcpu_report(report):
                 # Get the list of VCPU IDs available for this numa
                 if pars.DEBUG==1:
                     print_debug(debug_file,pars,menu.Yellow+"---------------------------------------------------------------------")
-                    print_debug(debug_file,pars,menu.Yellow+"DEBUG3 : numa={:} -- {:}vcpus  \tmyvCPUperNUMAlist:{:}".format(myNUMAidstring,len(myvCPUperNUMAlist),myvCPUperNUMAlist))
+                    print_debug(debug_file,pars,menu.Yellow+"DEBUG2 : numa={:} -- {:}vcpus  \tmyvCPUperNUMAlist:{:}".format(myNUMAidstring,len(myvCPUperNUMAlist),myvCPUperNUMAlist),2)
                 
                 # Goes through the vCPUs in this NUMA and unpacks all the ranges to produce a sorted list of VCPU iDs without duplicates
                 myvCPUperNUMAlist=unpackvcpus(clean_dups(myvCPUperNUMAlist))
@@ -1724,11 +1724,11 @@ class hw_vcpu_report(report):
                 #If "instances" key is not present under that compute:numa, it means there are no VMs on that NUMA
                 if "instances" not in numarecord.keys():
                     if pars.DEBUG==1:
-                        print_debug(debug_file,pars,menu.Yellow+"---------------------------------------------------------------------")
-                        print_debug(debug_file,pars,"DEBUG4 : WARNING : missing 'instances' key in  ",nodo_longformat)
-                        print_debug(debug_file,pars,"Numa ID:",myNumaId)
-                        print_debug(debug_file,pars,numarecord.keys())
-                        print_debug(debug_file,pars,"---------------------------------------------------------------------")
+                        print_debug(debug_file,pars,menu.Yellow+"---------------------------------------------------------------------",3)
+                        print_debug(debug_file,pars,"DEBUG3 : WARNING : missing 'instances' key in  ",nodo_longformat,3)
+                        print_debug(debug_file,pars,"Numa ID:",myNumaId,3)
+                        print_debug(debug_file,pars,numarecord.keys(),3)
+                        print_debug(debug_file,pars,"---------------------------------------------------------------------",3)
 
                 WarningString=""
                 # Scan the instances in the virsh JSON file by ID
@@ -1762,19 +1762,21 @@ class hw_vcpu_report(report):
                         virsh_NofActuallyUsedvCPUsbyVM=len(numarecord["instances"][myInstance]["cpus"])
 
                         if pars.DEBUG==1:
-                            print_debug(debug_file,pars,menu.Yellow+"---------------------------------------------------------------------")
-                            print("DEBUG5: INFO: numarecord['instances'][myInstance]['cpus']= ",numarecord["instances"][myInstance]["cpus"], " of length:",len(numarecord["instances"][myInstance]["cpus"]))
+                            print_debug(debug_file,pars,menu.Yellow+"---------------------------------------------------------------------",4)
+                            print("DEBUG4: INFO: numarecord['instances'][myInstance]['cpus']= ",numarecord["instances"][myInstance]["cpus"], " of length:",len(numarecord["instances"][myInstance]["cpus"]),4)
                     
-                            print_debug(debug_file,pars,"DEBUG5: INFO instance {:} in numa {:} === {:} can use {:} VCPUs(virsh_NofActuallyUsedvCPUsbyVM)\n\tFrom virsh (virsh_NofActuallyUsedvCPUsbyVM), it needs {:} vcpus. \n\tSpecifically it will use vcpus (vcpus_myVMcanuse): {:} ".format(
+                            print_debug(debug_file,pars,
+                            "DEBUG5: INFO : instance {:} in numa {:} === {:} : it needs {:} VCPUs(virsh_NofActuallyUsedvCPUsbyVM) out of the following list it can use (vcpus_myVMcanuse): {:} (of length={:})".format(
                                 myInstance,
                                 vm_numaused,
                                 myNUMAidstring,
-                                len(vcpus_myVMcanuse),
                                 virsh_NofActuallyUsedvCPUsbyVM,
-                                vcpus_myVMcanuse))
+                                vcpus_myVMcanuse,
+                                len(vcpus_myVMcanuse))
+                                ,5)
 
                             if virsh_NofActuallyUsedvCPUsbyVM!=len(vcpus_myVMcanuse):
-                                print_debug(debug_file,pars,"\tDEBUG5 AAAA: INFO : UNPINNED VM: # of virsh vcPUs={:}, len(vcpus_myVMcanuse)={:}".format(virsh_NofActuallyUsedvCPUsbyVM,len(vcpus_myVMcanuse)))
+                                print_debug(debug_file,pars,"DEBUG5 : UNPINNED VM: # of virsh vcPUs={:}, len(vcpus_myVMcanuse)={:}".format(virsh_NofActuallyUsedvCPUsbyVM,len(vcpus_myVMcanuse)),5)
 
                         for usedvcpu in vcpus_myVMcanuse:
                             if usedvcpu not in myvCPUperNUMAlist:
@@ -1794,7 +1796,7 @@ class hw_vcpu_report(report):
                                 VMUUID=str(VM["ID"])
                                 VMFLAVORID=VM["Flavor ID"]
                                 if pars.DEBUG==1:
-                                    print_debug(debug_file,pars,"\t"+mycolor+"DEBUG6: INFO Progetto={:} VMNAME={:} FLAVORID={:}".format(str_PROGETTO,VMNAME,VMFLAVORID))
+                                    print_debug(debug_file,pars,mycolor+"DEBUG6: INFO Progetto={:} VMNAME={:} FLAVORID={:}".format(str_PROGETTO,VMNAME,VMFLAVORID),6)
 
                                 VM_VCPUS_INFLAVOR=0
                                 #This section scans the openstack flavor to check if in Openstack the flavor has the properties to set the VM as CPU pinned
@@ -1803,8 +1805,8 @@ class hw_vcpu_report(report):
                                     VM_VCPUS_INFLAVOR=FLAVOR["VCPUs"]
                                     minidict= dictarray_object.parse_flavor_properties(pars,FLAVOR)
                                     if pars.DEBUG==1:
-                                        print_debug(debug_file,pars,mycolor+"\tDEBUG7: parsing flavor {:}".format(FLAVOR["ID"]))
-                                        print_debug(debug_file,pars,mycolor+"\tDEBUG7: \n\t"+json.dumps(FLAVOR,indent=22))
+                                        print_debug(debug_file,pars,mycolor+"DEBUG7: parsing flavor {:}".format(FLAVOR["ID"]),7)
+                                        print_debug(debug_file,pars,mycolor+"DEBUG7: \n\t"+json.dumps(FLAVOR,indent=22))
                                     
                                     if "HW:CPU_POLICY" in minidict.keys():
                                         if minidict["HW:CPU_POLICY"].upper()=="DEDICATED":
@@ -1815,7 +1817,7 @@ class hw_vcpu_report(report):
                                             mycolor=menu.OKGREEN
                                         else:
                                             mycolor=menu.FAIL
-                                        print_debug(debug_file,pars,mycolor+"\tDEBUG7: INFO: VM Pinning:  IN FLAVOR(VM_FLAVOR_IS_CPU_PINNED)={:} -- VM PINNED IN VIRSH(IS_VMPINNED_INVIRSH)={:} ".format(VM_FLAVOR_IS_CPU_PINNED,IS_VMPINNED_INVIRSH))
+                                        print_debug(debug_file,pars,mycolor+"DEBUG7: INFO: VM Pinning:  IN FLAVOR(VM_FLAVOR_IS_CPU_PINNED)={:} -- VM PINNED IN VIRSH(IS_VMPINNED_INVIRSH)={:} ".format(VM_FLAVOR_IS_CPU_PINNED,IS_VMPINNED_INVIRSH),7)
 
                                 if VM_VCPUS_INFLAVOR==0 or VM_VCPUS_INFLAVOR!=virsh_NofActuallyUsedvCPUsbyVM:
                                     CountVMsWithoutFlavor+=1
@@ -1826,8 +1828,9 @@ class hw_vcpu_report(report):
                                     Warnings.append(WarningString)
                                     pars.cast_error("00304",WarningString)
                                     if pars.DEBUG==1:
-                                        print_debug(debug_file,pars,mycolor+"\t\tDEBUG7B: INFO Corrected VM VCPUS from 0 as in flavor uuid {:}, using virsh data, to ={:} ".format(VMFLAVORID,VM_VCPUS))
+                                        print_debug(debug_file,pars,mycolor+"\t\tDEBUG7B: INFO Corrected VM VCPUS from 0 as in flavor uuid {:}, using virsh data, to ={:} ".format(VMFLAVORID,VM_VCPUS),7)
 
+                                # Calculation of additional per vCPU Load as well whether VM is pinned= from virsh
                                 AdditionalLoadIndexPerCPU=int(100*VM_VCPUS/len(vcpus_myVMcanuse))
                                 IS_VMPINNED=IS_VMPINNED_INVIRSH
 
@@ -1842,8 +1845,9 @@ class hw_vcpu_report(report):
                                         myNUMAidstring,
                                         virsh_NofActuallyUsedvCPUsbyVM,
                                         len(vcpus_myVMcanuse),
-                                        AdditionalLoadIndexPerCPU))
-                                    print_debug(debug_file,pars,"\tDEBUG8: Numa {:}\t\tLoad Before={:} ".format(myNUMAidstring,myvCPUperNUMAload))
+                                        AdditionalLoadIndexPerCPU)
+                                        ,8)
+                                    print_debug(debug_file,pars,"\tDEBUG8: Numa {:}\t\tLoad Before={:} ".format(myNUMAidstring,myvCPUperNUMAload),8)
    
                                 CrossNumaUsage=False
                                 for vcpu in vcpus_myVMcanuse:
@@ -1957,17 +1961,13 @@ class hw_vcpu_report(report):
                     if WarningString is None:
                         WarningString=""
                     self.UpdateLastRecordValueByKey( "NUMA_Warning",WarningString) 
-                    if pars.DEBUG==1:
+                    if pars.DEBUG>1:
                         print_debug(debug_file,pars,menu.Yellow+"DEBUG9 - INFO - Adding record to report for compute:{:} NUMA:{:} vCPU Id:{:} in index {:}".format(
                             nodo_longformat,
                             myNUMAidstring,myVCPUID,myVCPUindex
                         ))
                         print(self.Report[len(self.Report)-1])
 
-        #print("---------------------------------------------------------------------")
-        #print("DEBUG produce_hw_vcpu_report: ")
 
-        #self.print_report(pars)
-        #exit(-1)
     
                         
