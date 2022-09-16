@@ -13,204 +13,36 @@ import re
 import operator
 from datetime import datetime
 import traceback
+from  report_library import *
 
-from aop_logger import aop_logger
 
 
-DEBUG = 0
-
-# -------------------------------------------------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------------------------------------------------
-#                           CLASS :     PARAMETERS
-# -------------------------------------------------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------------------------------------------------
-class parameters:
-    # 
-    # -------------------------------------------------------------------------------------------------------------------------
-    # GLOBAL DICTIONARIES: these are used to store command line arguments values or user input values (so that the behavior is consistent between User interactive mode and CLI mode)
-
-    PATHFORAPPLICATIONCONFIGDATA='./'
-    CONFIGFILE = 'resource-analysis.json'
-    ERRORFILE = 'resource-analysis-errors.json'
-    SYSLOGFILE = 'resource-analysis.log'
-
-    APPLICATIONCONFIG_DICTIONARY={}
-    MODE_OF_OPT_OPS = 0
-    paramsdict={}
-    paramslist=[]
-    ERROR_REPORT=[]    
-    ERROR_DATA=[]
-    
-    # -------------------------------------------------------------------------------------------------------------------------
-    # FORMULAS FOR DISTANCE CALCULATION FROM TARGET
-    # -------------------------------------------------------------------------------------------------------------------------
-
-    # , 'abs(currentvalue-average)',  '(currentvalue-minimum)**4']
-    #metricformulas = ['(currentvalue-average)**2']
-    # -------------------------------------------------------------------------------------------------------------------------
-    NO_OPTIMIZATION = 0
-    OPTIMIZE_BY_CALC = 1
-    OPTIMIZE_BY_FILE = 2
+class parameters_specific(parameters):
 
     def __init__(self):
-        modulename="aop_logger"
-        if modulename not in sys.modules:
-            self.AOP_LOGGER_ENABLED=False
-        else:
-            self.AOP_LOGGER_ENABLED=True
-
-        now = datetime.now()  # current date and time
-        date_time = now.strftime("%d/%m/%Y %H:%M:%S")
-        #date_time = now.strftime("%d/%m/%Y")
-        self.paramsdict["TIMESTAMP"] = date_time
-        TMPJSON=[]
-        self.DSTSITES = []
-        screenrows, screencolumns = os.popen('stty size', 'r').read().split()
-        self.ScreenWitdh = int(screencolumns)
-        self.ColorsList =(menu.OKBLUE,menu.OKCYAN,menu.OKGREEN,menu.WARNING,menu.FAIL,menu.White,menu.Yellow,menu.Magenta,menu.Grey) 
-        self.ERROR_REPORT=[]
-        
+        super().__init__()
+        self.PATHFOROPENSTACKFILES=super().get_configdata_dictionary()["Files"]["PathForOpenstackFiles"]
         #-------------------------------------------------------------------------------------------------------------------
-        try:
-
-            with open(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE,'r') as ConfigFile:
-                try:
-                    TMPJSON = json.load(ConfigFile)
-                except:
-                    traceback.print_exc(limit=None, file=None, chain=True)
-                    print(" CRITICAL! : object class PARAMETERS, __init__ found JSON syntax error in  {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
-                    exit(-1)
-            self.APPLICATIONCONFIG_DICTIONARY=dict(TMPJSON)
-        #-------------------------------------------------------------------------------------------------------------------
-            self.PATHFOROPENSTACKFILES=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOpenstackFiles"]
-            self.PATHFOROUTPUTREPORTS=self.APPLICATIONCONFIG_DICTIONARY["Files"]["PathForOutputReports"]
+        self.FILETYPES=tuple(super().get_configdata_dictionary()["Files"]["FileTypes"])
+        self.EXTENDEDFILETYPES=tuple(super().get_configdata_dictionary()["Files"]["ExtendedFileTypes"])
+        self.EXTENDEDFILETYPES_OPTIONAL=tuple(super().get_configdata_dictionary()["Files"]["ExtendedFileTypes_Optional"])
         #-------------------------------------------------------------------------------------------------------------------
 
-        #-------------------------------------------------------------------------------------------------------------------
-            self.FILETYPES=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["FileTypes"])
-            self.EXTENDEDFILETYPES=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["ExtendedFileTypes"])
-            self.EXTENDEDFILETYPES_OPTIONAL=tuple(self.APPLICATIONCONFIG_DICTIONARY["Files"]["ExtendedFileTypes_Optional"])
-        #-------------------------------------------------------------------------------------------------------------------
-
-            self.paramsdict = self.APPLICATIONCONFIG_DICTIONARY["Application_Parameters"]
-            self.paramslist=list(self.APPLICATIONCONFIG_DICTIONARY["User_CLI_Visible_Parameters"])
-            self.metricformulas=self.APPLICATIONCONFIG_DICTIONARY["RackOptimizationInputParameters"]["MetricFormulasForRackOptimization"]
-        #-------------------------------------------------------------------------------------------------------------------
-        
-        except:
-            traceback.print_exc(limit=None, file=None, chain=True)
-            #-------------------------------------------------------------------------------------------------------------------
-            print("#-------------------------------------------------------------------------------------------------------------------")
-            print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application configuration file {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
-            print("\t Files {:} and  {:} must be , from thedirectory as python main executable, as follows: {:}".format(self.CONFIGFILE, self.ERRORFILE,self.PATHFORAPPLICATIONCONFIGDATA))
-            print("#-------------------------------------------------------------------------------------------------------------------")
-            exit(-1)
-        #-------------------------------------------------------------------------------------------------------------------
-        try:
-            with open(self.PATHFORAPPLICATIONCONFIGDATA+self.ERRORFILE,'r') as ConfigFile:
-                self.ERROR_DICTIONARY = json.load(ConfigFile)
-        except:
-            traceback.print_exc(limit=None, file=None, chain=True)
-            print("#-------------------------------------------------------------------------------------------------------------------")
-            print(" CRITICAL! : object class PARAMETERS, __init__ did not find the application configuration file {:}".format(self.PATHFORAPPLICATIONCONFIGDATA+self.CONFIGFILE))
-            print("\t Files {:} and  {:} must be , from the directory as python main executable, as follows: {:}".format(self.CONFIGFILE, self.ERRORFILE,self.PATHFORAPPLICATIONCONFIGDATA))
-            print("#-------------------------------------------------------------------------------------------------------------------")
-            exit(-1)
-         
-        self.DEBUG=self.APPLICATIONCONFIG_DICTIONARY["Application_Parameters"]["DEBUG"]
-        #-------------------------------------------------------------------------------------------------------------------
-        if self.AOP_LOGGER_ENABLED:
-            mysyslog=aop_logger(3,self.SYSLOGFILE)
-            myloghandler=mysyslog.syslog_handler(
-                    address= (self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Target"],
-                    self.APPLICATIONCONFIG_DICTIONARY["syslog"]["Port"]))
-            self.logger=mysyslog.logger
-        #-------------------------------------------------------------------------------------------------------------------
-
-
-
-    def set(self, key, value):
-        self.paramsdict[key] = value
-        return value
-
-    def get(self, key):
-        return self.paramsdict[key]
-
-    def is_silentmode(self):
-        return self.paramsdict["SILENTMODE"]
-    # -----------------------------------
-    def get_param_value(self, name):
-        return self.paramsdict[name]
-    # -----------------------------------
-    def get_azoptimization_mode(self):
-    # NO_OPTIMIZATION = 0
-    # OPTIMIZE_BY_CALC = 1
-    # OPTIMIZE_BY_FILE = 2
-        if len(self.paramsdict["HW_OPTIMIZATION_MODE"]) == 0:
-            MODE_OF_OPT_OPS = self.NO_OPTIMIZATION
-        else:
-            if self.paramsdict["HW_OPTIMIZATION_MODE"].find('OPTIMIZE') > -1:
-                MODE_OF_OPT_OPS = self.OPTIMIZE_BY_CALC
-            else:
-                MODE_OF_OPT_OPS = self.OPTIMIZE_BY_FILE
-        return MODE_OF_OPT_OPS
-    # -----------------------------------
-    def show_cli_command(self):
-        MyLine = menu.OKGREEN+'{0:_^'+str(self.ScreenWitdh)+'}'
-        print(MyLine.format('LIST OF PARAMETER ARGUMENTS'))
-        print(json.dumps(self.paramsdict,indent=40))
-        # PRINT CLI COMMAND AND PARAMETERS USED
-        CMD = "python3 resource-analysis.py"
-        for x in self.paramsdict:
-            if x in self.paramslist:
-                if type(x) == list:
-                    l = len(x)
-                    CMD += "{}=".format(x)
-                    for x2 in x:
-                        CMD += "{}".format(x2)
-                        if x2 != x[l]:
-                            CMD += ","
-                else:
-                    CMD += " {}={} ".format(x, self.paramsdict[x])
-
-        CMD2 = CMD.replace("[", "")
-        CMD3 = CMD2.replace("]", "")
-        CMD4 = CMD3.replace(", ", ",")
-        print(CMD4)
-        return True
-        
-    def SuffixToShortDate(self,suffix):
-        retval =suffix[6:8]+"-"+suffix[4:6]+"-"+suffix[0:4]
-        return retval
-
-    def SuffixToYYMMDDDateValue(self,suffix):
-        retval =int(suffix[0:4]+suffix[4:6]+suffix[6:8])
-        return retval
-# --------------------EXTRACTS SITENAME FROM SUFFISSO note : STG810 specific parsing
-    def parse_suffisso(self, suffisso):
-        if len(suffisso) == 20:
-            # NOTE: STG810 does not show stg810 in the suffix as the cc-jumphost hostname is configured wrongly
-            sitename= suffisso[14:]
-            retval=sitename.lower()
-        else:
-            sitename= "stg810"
-            retval=sitename.lower()
-        return retval
 
     def IsItAMgmtSite(self,suffix):
             Sitename=self.parse_suffisso(suffix)
-            if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LiveMgmtSites"]:
+            if Sitename in super().get_configdata_dictionary()["SitesCategories"]["LiveMgmtSites"]:
                 Retval=True
-            if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["LabMgmtSites"]:
+            if Sitename in super().get_configdata_dictionary()["SitesCategories"]["LabMgmtSites"]:
                 Retval= True
             else:
                 Retval =False
             return Retval
 
     def SiteType(self, sitename):
-        Categs= self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["Categories"]
+        Categs= super().get_configdata_dictionary()["SitesCategories"]["Categories"]
         for Item in Categs:
-            if sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][Item]:
+            if sitename in super().get_configdata_dictionary()["SitesCategories"][Item]:
                 return Item
             
         return "??"
@@ -222,9 +54,9 @@ class parameters:
                 ErrString= "Category passed to IsItWhatSite is not in application config data list :"+category
                 self.cast_error("00011",ErrString)
 
-            if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][category]:
+            if Sitename in super().get_configdata_dictionary()["SitesCategories"][category]:
                 Retval=True
-            if Sitename in self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][category]:
+            if Sitename in super().get_configdata_dictionary()["SitesCategories"][category]:
                 Retval= True
             else:
                 Retval =False
@@ -240,9 +72,9 @@ class parameters:
             Retval=[]
 
             ParamsList=SuffixParameter.split(",")
-            SiteCmdList= self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["SiteCommands"]
-            SiteCmdMap=self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["SiteCommandMap"]
-            TimeCmdList= self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"]["TimeCommands"]
+            SiteCmdList= super().get_configdata_dictionary()["SitesCategories"]["SiteCommands"]
+            SiteCmdMap=super().get_configdata_dictionary()["SitesCategories"]["SiteCommandMap"]
+            TimeCmdList= super().get_configdata_dictionary()["SitesCategories"]["TimeCommands"]
 
             MySiteList=[]
             SiteCommandsList=[]
@@ -257,7 +89,7 @@ class parameters:
                 if Item in SiteCmdList:
                     SiteCommandsList.append(Item)
                     for SubItem in SiteCmdMap[Item]:
-                        MyAddlSitesList=self.APPLICATIONCONFIG_DICTIONARY["SitesCategories"][SubItem]
+                        MyAddlSitesList=super().get_configdata_dictionary()["SitesCategories"][SubItem]
                         MySiteList+=MyAddlSitesList
                 elif Item in TimeCmdList:
                     TimeCommandsList.append(Item)
@@ -343,50 +175,7 @@ class parameters:
             self.cast_error("00003","Array CleanList is empty: 0 records")
         retval=self.Parse_Filtered_OS_FileList_BySuffixOrCommandMatch( cleanlist, suffissotouse)
         return(retval)
-    
-    def cast_error(self,ErrorCode, AddlData):
-        NEWRECORD=[]
-        a = str(self.__class__)
-        #traceback.print_exc(limit=None, file=None, chain=True)
-        #ErrorObjectClass= a.replace("'",'').replace("<",'').replace(">","").replace("class ","")
 
-        ErrorInfo=self.ERROR_DICTIONARY[ErrorCode]
-        #print(json.dumps(ErrorInfo,indent=30))
-        ErrorObjectClass=ErrorInfo["Class"]
-        SrcSuffix=self.get_param_value("SOURCE_SITE_SUFFIX")
-        SiteName= self.parse_suffisso(SrcSuffix)
-        if ErrorInfo["Level"]in self.APPLICATIONCONFIG_DICTIONARY["syslog"]["ErrorsToReport"]:
-            NEWRECORD.append(SrcSuffix[0:8])
-            NEWRECORD.append(SiteName)
-            NEWRECORD.append(ErrorInfo["Level"])
-            NEWRECORD.append(ErrorObjectClass)
-            NEWRECORD.append(ErrorCode)
-            NEWRECORD.append(ErrorInfo["Synopsis"])
-            NEWRECORD.append(AddlData)
-            #NEWRECORD.append(ErrorInfo)
-
-            if self.AOP_LOGGER_ENABLED:
-                syslogstring="Timestamp: {:9s} Site: {:12s} ErrCode: {:5s} Class:{:30s} Synopsis:{:60s}: {:120s}".format(SrcSuffix[0:8],
-                            SiteName,ErrorCode,ErrorObjectClass,ErrorInfo["Synopsis"],AddlData)
-                if ErrorInfo["Level"]=="CRITICAL":
-                    self.logger.critical(syslogstring)
-                elif ErrorInfo["Level"]=="ERROR":
-                    self.logger.error(syslogstring)
-                elif ErrorInfo["Level"]=="WARNING":
-                    self.logger.warning(syslogstring)
-
-            self.ERROR_REPORT.append(NEWRECORD)
-        
-        
-
-        actions = ErrorInfo["AfterErrorExecution"]
-        for Item in actions:
-            print("cast_error")
-            print(ErrorCode)
-            print(NEWRECORD)
-            print(AddlData)
-            print(Item)
-            eval(Item)
 
 
 # -------------------------------------------------------------------------------------------------------------------------
@@ -539,9 +328,7 @@ class dictarray:
         for item in self.AGGREGATE_LIST:
             if mynodo in item["hosts"]:
                 appartenenza_nodo.append(str(item["name"]))
-        if DEBUG >= 3:
-            print(
-                "--- DEBUG --- for nodo={:s} agglist={:s}".format(mynodo, appartenenza_nodo))
+
         return appartenenza_nodo
 
 

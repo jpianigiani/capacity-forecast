@@ -218,5 +218,20 @@
             "Synopsis":"Unpinned VM on vCPU pinned to another VM",
             "Class":"Possible vCPU stealing",
             "AfterErrorExecution":[ ]
+        },
+        "00308":
+        {
+            "Level":"ERROR",
+            "Synopsis":"LOW FREE MEMORY on compute",
+            "Class":"Compute resources exhaust",
+            "AfterErrorExecution":[ ]
+        },
+        "00309":
+        {
+            "Level":"CRITICAL",
+            "Synopsis":"VM unpinned in virsh, but pinned in Flavor",
+            "Class":"Needs reinstantiation",
+            "AfterErrorExecution":[ ]
         }
+           
     }

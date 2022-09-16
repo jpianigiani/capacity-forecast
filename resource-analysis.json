@@ -1,10 +1,11 @@
 {
-"syslog":{"Target":"","Port":"514", "ErrorsToReport":["CRITICAL"]},
+"syslog":{"Target":"172.23.94.71","Port":"5143", "ErrorsToReport":["CRITICAL"]},
 "DefaultValues":
     {
         "DefaultFlavorProperties":      {"vnf_type":"DT_NIMS_EXT"},
         "DefaultFlavorProperties_StringReplace":      {"DTNIMS":"DT_NIMS"},
         "ServicesToSkip": ["service", "admin", "tempest", "c_rally", "DeleteMe", "Kashif"],
+        "PerNUMA_FreeRAM_ThresholdPct":10,
         "ServiceNameWildCard":"#"
         
     },
@@ -12,7 +13,7 @@
 "ReportsSettings":
     { 
     "ReportTypesNotToBePrintedOnScreen":["SERVICEGRAPH_REPORT"],
-    "WrapLinesWhenWritingToFiles":false
+    "WrapLinesWhenWritingToFiles":true
     }
     ,
 
@@ -48,7 +49,7 @@
         "SERVICE": [], 
         "ANYSERVICE":false,
         "SERVICEGRAPHENABLED":false,
-        "HWNUMAAWARE":true,
+        "HWNUMAAWARE":false,
         "IGNOREHOSTAGS": false, 
         "WIPE_DESTSITE": false, 
         "BESTVMDISTRO": true, 
@@ -56,7 +57,7 @@
         "HW_OPTIMIZATION_MODE": "", 
         "SKIPMGMTSITE": false,
         "JUSTSOURCE": true,
-        "DEBUG":0,
+        "DEBUG":1,
         "INITIALSERVICEVALUE":[]
     },
     "User_CLI_Visible_Parameters": 
@@ -234,7 +235,7 @@
         "CephPerVMGB": "self.mem_show_as_gb(value.rjust(length),False)",
         "PctUsageOfCmpt": "self.show_as_percentage(value,length)",
         "TargetHostAggr": "self.shorten_hostaggs(value).rjust(length)",
-        "ExistingVMs": "self.split_vnfname(value,'vnfname')+'-'+self.split_vnfname(value,'vnfcname') +' '",
+        "ExistingVMs": "self.split_string(value,'vnfname')+'-'+self.split_string(value,'vnfcname') +' '",
         "NewVMs": "(value).ljust(10)",
         "VCPUsPerRack": "value.rjust(length)",
         "RAMperRack": "self.mem_show_as_gb(value, True).rjust(length)",
@@ -257,7 +258,7 @@
     } ,
 "FieldTransformsAttributes":
 {
-    "split_vnfname":{ 
+    "split_string":{ 
         "Site": "([a-z,A-Z]{3}[0-9]{3})",
         "Lineup":".{6}([a-z,A-Z][0-9]{2})",
         "Vendor":".{9}([a-z,A-Z]{3})",

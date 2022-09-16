@@ -12,7 +12,8 @@ import math
 import operator
 from datetime import datetime
 
-from mycapacitymodule import *
+from report_library import *
+from mycapacitymodule import dictarray, parameters_specific
 from mycapacitymodule2 import *
 from aop_logger import *
 #import resource_analysis 
@@ -27,7 +28,7 @@ def main(arguments):
     os.system('clear')  
 
     # Initialization of global variables
-    MyPARAMSDICT=parameters()
+    MyPARAMSDICT=parameters_specific()
     SRC_DA= dictarray()
     DST_DA= dictarray()
     ERROR_REPORTBOX = error_report(MyPARAMSDICT)
@@ -239,7 +240,7 @@ def main(arguments):
         # Print Total Report of Results
         
             stringa1 = MyLine.format(menu.FAIL+"  SUMMARY OF RESULTS "+menu.Yellow)
-            MyPARAMSDICT.myprint(MyLine.format(stringa1))
+            print(MyLine.format(stringa1))
             FINAL_REPORTBOX.print_report(MyPARAMSDICT)
     # SHOW Parameters dump plus CLI command for subsequent executions via CLI command  
     ERROR_REPORTBOX.set_name("ERRORS_REPORT")
