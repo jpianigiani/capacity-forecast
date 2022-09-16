@@ -564,7 +564,8 @@ class report():
             
                 retval.append(myline)
             string1="_"*LineLenTotal
-            retval.append(string1)
+            if self.MultiLineFlag:
+                retval.append(string1)
         return retval,myunwrappedline
 
             
